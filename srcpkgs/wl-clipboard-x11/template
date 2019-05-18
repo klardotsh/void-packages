@@ -1,0 +1,13 @@
+# Template file for 'wl-clipboard-x11'
+pkgname=wl-clipboard-x11
+version=4
+revision=1
+build_style=gnu-makefile
+depends="wl-clipboard"
+short_desc="Use wl-clipboard as a drop-in replacement to X11 clipboard tools"
+maintainer="klardotsh <josh@klar.sh>"
+license="GPL-3.0-or-later"
+homepage="https://github.com/brunelli/wl-clipboard-x11"
+distfiles="https://github.com/brunelli/wl-clipboard-x11/archive/v${version}.tar.gz"
+checksum=25a4b4519600e19f8503569b46c80bcbf2d8647ace384d4acacb67e3114a21c6
+alternatives="xclip:wl-clipboard-x11:/usr/bin/xclip xsel:wl-clipboard-x11:/usr/bin/xsel"
