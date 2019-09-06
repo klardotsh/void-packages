@@ -1,21 +1,18 @@
 # Template file for 'linux5.3'
 _pkgname=linux
 pkgname=linux5.3
-_pkgversion=5.3.0-rc1
-version=5.3.0+rc1
-revision=1
+_pkgversion=5.3.0-rc6
+version=5.3.0+rc6
+revision=2
 wrksrc="linux-${version}"
 short_desc="Linux kernel and modules (${version%.*} series)"
 maintainer="Helmut Pozimski <helmut@pozimski.eu>"
 license="GPL-2.0-only"
 homepage="https://www.kernel.org"
-#distfiles="https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-${version}.tar.xz"
-_gitcommit="74ad65d2fb94cf005e25498e290babdbd4e3978e"
-#_gitcommit="060d531eccef249fd0826024f7b76e8c4257c8d4"
+_gitcommit="9bd5464a8745f591cb8601d804a5cfde07006926"
 distfiles="https://github.com/aarch64-laptops/linux/archive/${_gitcommit}.tar.gz"
-#checksum=0c2a831f993dc8a8a8e1ca4186b467de72ff173c6f5855e2aab70f6f7fb033f9
-checksum=a5370af0a350aa8e218e4348d502d824a78d4e992a29239dfcc9e2f94d19a510
-#checksum=6f2737781733d1dbb2158e2212964873d15c69b33fd7349eb9d002cd5411706e
+checksum=436983631cb43c0ba30fb94e4392197139329b8c260bdc0364c84d409a6acc88
+
 patch_args="-Np1"
 wrksrc="${_pkgname}-${_gitcommit}"
 
