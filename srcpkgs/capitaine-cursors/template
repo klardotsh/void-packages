@@ -1,0 +1,19 @@
+# Template file for 'capitaine-cursors'
+pkgname=capitaine-cursors
+version=r3
+revision=1
+create_wrksrc=yes
+archs=noarch
+hostmakedepends=""
+depends=""
+short_desc="An x-cursor theme inspired by macOS and based on KDE Breeze"
+maintainer="klardotsh <josh@klar.sh>"
+license="LGPL-3"
+homepage="https://kver.wordpress.com/2015/01/09/curses-i-mean-cursors/"
+distfiles="https://github.com/keeferrourke/capitaine-cursors/releases/download/r3/capitaine-cursors.tar.xz"
+checksum=ec43cade1c4d8698ac3b35b08f13af17d5a86c64a8ff4e24ed8d05007d4aaae1
+
+do_install() {
+	vinstall dist/index.theme 644 usr/share/icons/capitaine-cursors
+	vcopy dist/cursors usr/share/icons/capitaine-cursors/cursors
+}
