@@ -1,8 +1,8 @@
 # Template file for 'libGL'
 pkgname=libGL
-version=19.1.4
+version=19.2.0+rc2
 revision=1
-wrksrc="mesa-${version}"
+wrksrc="mesa-mesa-19.2.0-rc2"
 build_style=meson
 configure_args="-Dshared-glapi=true -Dgbm=true -Degl=true
  -Dgallium-vdpau=true -Dgallium-xvmc=true -Dosmesa=gallium
@@ -20,8 +20,10 @@ maintainer="Orphaned <orphan@voidlinux.org>"
 license="MIT, LGPL-2.1-or-later"
 homepage="https://www.mesa3d.org/"
 changelog="https://www.mesa3d.org/relnotes/${version}.html"
-distfiles="https://mesa.freedesktop.org/archive/mesa-${version}.tar.xz"
-checksum=a6d268a7d9edcfd92b6da80f2e34e6e0a7baaa442efbeba2fc66c404943c6bfb
+#distfiles="https://mesa.freedesktop.org/archive/mesa-${version}.tar.xz"
+distfiles="https://github.com/mesa3d/mesa/archive/mesa-19.2.0-rc2.tar.gz"
+#checksum=a6d268a7d9edcfd92b6da80f2e34e6e0a7baaa442efbeba2fc66c404943c6bfb
+checksum=9329df625629b14e62c243aaf5a8e1c1ae9deda829ecef35617f985cea1c2082
 
 # Set subpackages manually to set proper rdeps in 32bit pkgs.
 subpackages="libglapi libgbm libEGL libGLES libOSMesa"
@@ -54,10 +56,10 @@ ppc*)
 	subpackages+=" mesa-ati-dri mesa-nouveau-dri"
 	;;
 aarch64*)
-	configure_args+=" -Dgallium-drivers=nouveau,tegra,swrast,vc4"
+	configure_args+=" -Dgallium-drivers=nouveau,tegra,swrast,vc4,freedreno"
 	configure_args+=" -Dvulkan-drivers= -Ddri-drivers="
 	configure_args+=" -Ddri3=true"
-	subpackages+=" mesa-tegra-dri mesa-nouveau-dri mesa-vc4-dri"
+	subpackages+=" mesa-tegra-dri mesa-nouveau-dri mesa-vc4-dri mesa-freedreno-dri"
 	;;
 armv7l*)
 	# Enable Videocore IV and swrast for RaspberryPi
@@ -204,7 +206,7 @@ mesa-intel-dri_package() {
 mesa-nouveau-dri_package() {
 	short_desc="Mesa DRI drivers for NVIDIA GPUs (nouveau dri)"
 	pkg_install() {
-		vmove "usr/lib/libXvMCnouveau.so.*"
+		vmove "usr/lib/libXvMCnouveau.so*"
 		vmove "usr/lib/vdpau/libvdpau_nouveau.so*"
 		vmove "usr/lib/xorg/modules/drivers/nouveau*"
 		vmove "usr/lib/dri/nouveau*"
@@ -227,6 +229,13 @@ mesa-vc4-dri_package() {
 	short_desc="Mesa DRI drivers for Videocore IV GPU"
 	pkg_install() {
 		vmove "usr/lib/xorg/modules/drivers/vc4*"
+	}
+}
+
+mesa-freedreno-dri_package() {
+	short_desc="Mesa DRI drivers for FreeDreno-supported GPU"
+	pkg_install() {
+		vmove "usr/lib/xorg/modules/drivers/msm_dri.so"
 	}
 }
 
