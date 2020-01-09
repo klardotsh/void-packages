@@ -1,0 +1,27 @@
+# Template file for 'python-logbook'
+pkgname=python-logbook
+version=1.5.3
+revision=1
+wrksrc="logbook-${version}"
+build_style=python-module
+hostmakedepends="python-setuptools python3-setuptools"
+makedepends="python-devel python3-devel"
+short_desc="A cool logging replacement for Python"
+maintainer="klardotsh <josh@klar.sh>"
+license="BSD"
+homepage="https://logbook.readthedocs.io/en/stable/"
+changelog="https://logbook.readthedocs.io/en/stable/changelog.html"
+distfiles="https://github.com/getlogbook/logbook/archive/${version}.tar.gz"
+checksum=d23a1d2b3dd094adcafb6c7e636f9b88782a6868538f96beb7b10534f9a16557
+
+post_install() {
+	vlicense LICENSE
+}
+
+python3-logbook_package() {
+	short_desc="${short_desc/Python2/Python3}"
+	pkg_install() {
+		vmove usr/lib/python3*
+		vlicense LICENSE
+	}
+}
