@@ -1,0 +1,22 @@
+# Template file for 'swaylock'
+pkgname=swaylock-effects
+_gitcommit="6f29f07654b289e870ffb0c619410c2f09c9259b"
+version=1.4
+revision=1
+build_style=meson
+conf_files="/etc/pam.d/swaylock"
+hostmakedepends="pkg-config wayland-devel scdoc git"
+makedepends="wayland-protocols cairo-devel gdk-pixbuf-devel pam-devel
+ libxkbcommon-devel wayland-devel libgomp-devel"
+conflicts="swaylock"
+short_desc="Screen locker for Wayland"
+maintainer="klardotsh <josh@klar.sh>"
+license="MIT"
+homepage="https://swaywm.org"
+distfiles="https://github.com/mortie/${pkgname}/archive/${_gitcommit}.tar.gz"
+checksum=b6b4c86ed145f23b220cf3128c0c8463ad7cacbed604ae6dc8541526139de0a7
+wrksrc="swaylock-effects-${_gitcommit}"
+
+post_install() {
+	vlicense LICENSE
+}
