@@ -12,7 +12,6 @@ wrksrc="cli-${version}"
 #
 # https://github.com/zeit/pkg/issues/584
 hostmakedepends="git nodejs-lts-10"
-depends="nodejs"
 short_desc="Command line vault"
 maintainer="klardotsh <josh@klar.sh>"
 license="GPL-3.0"
