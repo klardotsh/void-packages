@@ -1,0 +1,44 @@
+# Template file for 'bitwarden-cli'
+pkgname=bitwarden-cli
+version=1.8.0
+revision=1
+# FIXME aarch64 should be doable, but it's difficult to test, I get:
+# => ERROR: cross-aarch64-linux-gnu: this package cannot be built for x86_64-musl.
+archs="i686* x86_64*"
+wrksrc="cli-${version}"
+# requires the old version of Node because of
+# > pkg@4.3.4
+# > Error! No available node version satisfies 'node13'
+#
+# https://github.com/zeit/pkg/issues/584
+hostmakedepends="git nodejs-lts-10"
+depends="nodejs"
+short_desc="Command line vault"
+maintainer="klardotsh <josh@klar.sh>"
+license="GPL-3.0"
+homepage="https://bitwarden.com"
+distfiles="https://github.com/bitwarden/cli/archive/v${version}.tar.gz"
+checksum=a3293f01a36d17cbf5051c2be3829dc5fc6cead362149d1f8622cc67be397c76
+nostrip=yes
+# works around
+# SONAME: libc.musl-x86_64.so.1 <-> UNKNOWN PKG PLEASE FIX!
+noverifyrdeps=yes
+
+do_build() {
+	npm ci
+
+	# forcibly install the submodule manually - evidently submodules can't be
+	# pulled correctly when building from a Github archive (even if you run "git
+	# init" here first)
+	git clone https://github.com/bitwarden/jslib.git
+
+	# break down "dist:lin" task to unbreak musl builds (else dependency on
+	# glibc is detected at rdeps stage)
+	npm run build:prod
+	npm run clean
+	npx pkg . --targets host --output ./dist/linux/bw
+}
+
+do_install() {
+	vbin dist/linux/bw bw
+}
