@@ -1,19 +1,44 @@
 # Template file for 'capitaine-cursors'
 pkgname=capitaine-cursors
-version=r3
+_pkgname=capitaine-cursors
+version=r4
 revision=1
-create_wrksrc=yes
 archs=noarch
-hostmakedepends=""
-depends=""
+build_style=meta
+makedepends="bc inkscape xcursorgen"
+depends="capitaine-cursors-dark capitaine-cursors-light"
 short_desc="An x-cursor theme inspired by macOS and based on KDE Breeze"
 maintainer="klardotsh <josh@klar.sh>"
 license="LGPL-3"
 homepage="https://kver.wordpress.com/2015/01/09/curses-i-mean-cursors/"
-distfiles="https://github.com/keeferrourke/capitaine-cursors/releases/download/r3/capitaine-cursors.tar.xz"
-checksum=ec43cade1c4d8698ac3b35b08f13af17d5a86c64a8ff4e24ed8d05007d4aaae1
+distfiles="https://github.com/keeferrourke/capitaine-cursors/archive/${version}/capitaine-cursors.tar.gz"
+checksum=41f66e9f4d41729dc5e9185aab3bc4a719fdcca939e6f3f590b6b811b28dedd2
+
+do_build() {
+	./build.sh -t dark
+	./build.sh -t light
+}
 
 do_install() {
-	vinstall dist/index.theme 644 usr/share/icons/capitaine-cursors
-	vcopy dist/cursors usr/share/icons/capitaine-cursors/cursors
+	true
+}
+
+capitaine-cursors-dark_package() {
+	depends=""
+	short_desc="An x-cursor theme inspired by macOS and based on KDE Breeze (dark theme)"
+
+	pkg_install() {
+		vinstall dist/dark/index.theme 644 usr/share/icons/capitaine-cursors-dark
+		vcopy dist/dark/cursors usr/share/icons/capitaine-cursors-dark/cursors
+	}
+}
+
+capitaine-cursors-light_package() {
+	depends=""
+	short_desc="An x-cursor theme inspired by macOS and based on KDE Breeze (light theme)"
+
+	pkg_install() {
+		vinstall dist/light/index.theme 644 usr/share/icons/capitaine-cursors-light
+		vcopy dist/light/cursors usr/share/icons/capitaine-cursors-light/cursors
+	}
 }
