@@ -10,6 +10,7 @@ klardotsh_packages = {
     'capitaine-cursors',
     'swaylock-effects',
     'chamber',
+    'pre-commit',
 }
 
 arch_mappings = {
