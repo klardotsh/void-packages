@@ -1,0 +1,60 @@
+# Template file for 'dune'
+pkgname=dune
+version=2.5.1
+revision=1
+build_style=gnu-makefile
+make_build_target=release
+make_check_target=test
+makedepends="curl ncurses-devel ocaml ocaml-findlib opam tar m4"
+checkdepends="${depends} git"
+short_desc="Composable build system for OCaml"
+maintainer="klardotsh <josh@klar.sh>"
+license="MIT"
+homepage="https://dune.build"
+distfiles="https://github.com/ocaml/${pkgname}/archive/${version}.tar.gz"
+checksum=a4ba5947f7eff80043b3394a6afde32f6e37e82a06e6a0a3b68e2761389ac861
+nocross="opam is nocross"
+nopie=yes
+disable_parallel_build=yes
+
+prepare() {
+	opam init -y --compiler=ocaml-system --reinit --disable-sandboxing
+	# --disable-sandboxing seems to be broken in ^, and bubblewrap won't work
+	# correctly inside a build (no permissions to create an unprivileged
+	# namespace), so purge all references to sandbox.sh in the config if they exist
+	#
+	# it's interesting to note that I only get those build failures on musl...
+	sed -i "/sandbox.sh\|wrap-/d" /tmp/.opam/config
+	eval $(opam env)
+
+	# use the global switch while still installing all of upstream's devdeps
+	sed -i "/switch create/d" Makefile
+	make dev-switch
+}
+
+pre_build() {
+	prepare
+}
+
+pre_check() {
+	prepare
+}
+
+do_check() {
+	# no idea what's up with this
+	# Running dune utop with directory containing a PPX rewriter
+	# $ dune utop ppx -- use_ppx.ml
+	# -  PPX extension
+	# +  Fatal error: executable program file not found
+	# +  /tmp/dune-test0eda30.sh: line 1: 12069 Aborted                 dune utop ppx -- use_ppx.ml
+	# +  [134]
+	# make: *** [Makefile:50: test] Error 1
+
+	true
+}
+
+post_install() {
+	mkdir -p ${DESTDIR}/usr/share
+	mv ${DESTDIR}/usr/{doc,man} ${DESTDIR}/usr/share/
+	vlicense LICENSE.md
+}

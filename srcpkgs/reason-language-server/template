@@ -1,0 +1,36 @@
+# Template file for 'reason-language-server'
+pkgname=reason-language-server
+version=1.7.8
+revision=1
+makedepends="ocaml opam dune esy m4 git tar"
+short_desc="Language server for Reason, in Reason"
+maintainer="klardotsh <josh@klar.sh>"
+license="MIT"
+homepage="https://github.com/jaredly/reason-language-server"
+distfiles="https://github.com/jaredly/${pkgname}/archive/${version}.tar.gz"
+checksum=dea70f17377e9e0fbc1839b1a181703737d89599f59e98398ca9ecf20481240a
+nocross="opam is nocross"
+nopie=yes
+disable_parallel_build=yes
+
+do_build() {
+	# for whatever reason the esy.lock is corrupted - just trash it and
+	# reconstruct
+	rm -rf esy.lock
+
+	esy
+	esy cp-bin
+}
+
+do_check() {
+	esy cp-test
+	./RunTests.exe
+}
+
+do_install() {
+	false
+}
+
+post_install() {
+	vlicense LICENSE
+}

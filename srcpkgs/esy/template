@@ -1,0 +1,110 @@
+# Template file for 'esy'
+pkgname=esy
+version=0.6.4
+revision=1
+_esy_solve_cudf_version=0.1.10
+makedepends="ocaml opam dune tar m4 perl git"
+short_desc="Package.json workflow for native development with Reason/OCaml"
+maintainer="klardotsh <josh@klar.sh>"
+license="BSD-2-Clause"
+homepage="https://esy.sh"
+distfiles="https://github.com/esy/${pkgname}/archive/v${version}.tar.gz"
+checksum="f465ced0a72a9f1395ef0a2a357a823f500dc429829b6a823a72bd6a8f399e10"
+nocross="opam is nocross"
+nopie=yes
+disable_parallel_build=yes
+
+prepare() {
+	opam init -y --compiler=ocaml-system --reinit --disable-sandboxing
+	# --disable-sandboxing seems to be broken in ^, and bubblewrap won't work
+	# correctly inside a build (no permissions to create an unprivileged
+	# namespace), so purge all references to sandbox.sh in the config if they exist
+	#
+	# it's interesting to note that I only get those build failures on musl...
+	sed -i "/sandbox.sh\|wrap-/d" /tmp/.opam/config
+	eval $(opam env)
+
+	# thanks, anmonteiro on discord, for the advice to pin angstrom
+	# not doing so results in type signature mismatches:
+
+	# File "esy-lib/Parse.re", line 27, characters 2-13:
+	# 27 |   | Ok(fname) => return(fname)
+	#        ^^^^^^^^^^^
+	# Error: This pattern matches values of type ('a, 'b) result
+	#        but a pattern was expected which matches values of type
+	#          consume:Consume.t -> ('c, string) result
+	# => ERROR: esy-0.6.4_1: do_build: 'dune build -p ${pkgname},${pkgname}-build-package' exited with 1
+	# => ERROR:   in do_build() at srcpkgs/esy/template:62
+
+	opam install -y \
+		'angstrom<0.14' \
+		reason \
+		bos \
+		fmt \
+		fpath \
+		logs \
+		lwt \
+		lwt_ppx \
+		menhir \
+		opam-file-format \
+		ppx_deriving \
+		ppx_deriving_yojson \
+		ppx_expect \
+		ppx_inline_test \
+		ppx_let \
+		ppx_sexp_conv \
+		re \
+		yojson \
+		cudf \
+		dose3 \
+		opam-format \
+		opam-core \
+		opam-state
+
+	git clone https://github.com/esy-ocaml/cmdliner.git
+	cd cmdliner && opam install -y .
+}
+
+pre_build() {
+	prepare
+}
+
+do_build() {
+	dune build -p ${pkgname},${pkgname}-build-package
+
+	git clone https://github.com/andreypopp/esy-solve-cudf.git
+	cd esy-solve-cudf
+	git checkout "v${_esy_solve_cudf_version}"
+
+	# use opam-provided upstream mccs instead of the submodule, because the
+	# submodule expects jbuilder and "dune upgrade" doesn't work on its scripts
+	opam install -y mccs
+	dune build -p esy-solve-cudf
+}
+
+do_check() {
+	dune runtest test
+}
+
+do_install() {
+	vbin ${FILESDIR}/${pkgname}
+
+	# the default/ structure and million levels of indirection have to stick
+	# around due to some hard-coded path searches at runtime (example of
+	# failure: 'Fatal error: exception (Failure "Unable to resolve
+	# ../../../package.json from /usr/lib/esy/bin/")')
+	mkdir -p ${DESTDIR}/usr/lib/${pkgname}/${pkgname}/default/{bin,esy-build-package/bin}
+
+	mv package.json ${DESTDIR}/usr/lib/${pkgname}/
+	mv _build/default/bin/esy.exe ${DESTDIR}/usr/lib/${pkgname}/${pkgname}/default/bin/
+	mv _build/default/bin/esyInstallRelease.js ${DESTDIR}/usr/lib/${pkgname}/${pkgname}/default/bin/
+	mv _build/default/esy-build-package/bin/*.exe ${DESTDIR}/usr/lib/${pkgname}/${pkgname}/default/esy-build-package/bin/
+
+	mkdir -p ${DESTDIR}/usr/lib/${pkgname}/node_modules/esy-solve-cudf
+	mv esy-solve-cudf/package.json ${DESTDIR}/usr/lib/${pkgname}/node_modules/esy-solve-cudf/
+	mv esy-solve-cudf/_build/default/bin/esySolveCudfCommand.exe ${DESTDIR}/usr/lib/${pkgname}/node_modules/esy-solve-cudf/
+}
+
+post_install() {
+	vlicense LICENSE
+}
