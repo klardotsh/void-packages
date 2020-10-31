@@ -7,11 +7,16 @@ _titles_version=0.1.2c
 version=0.3.1
 revision=1
 build_style=cmake
-configure_args="-DOPENRCT2_VERSION_TAG=${version} -DDOWNLOAD_TITLE_SEQUENCES=0 -DDOWNLOAD_OBJECTS=0 $(vopt_if multiplayer "" "-DDISABLE_NETWORK=1") $(vopt_if scripting "-DENABLE_SCRIPTING=1" "")"
+configure_args="
+ -DOPENRCT2_VERSION_TAG=${version}
+ -DDOWNLOAD_TITLE_SEQUENCES=0
+ -DDOWNLOAD_OBJECTS=0
+ $(vopt_if multiplayer '' '-DDISABLE_NETWORK=1')
+ $(vopt_if scripting '-DENABLE_SCRIPTING=1' '')"
 hostmakedepends="pkg-config unzip"
 makedepends="SDL2-devel fontconfig-devel freetype-devel libzip-devel
  libpng-devel speexdsp-devel jansson-devel icu-devel zlib-devel json-c++
- $(vopt_if multiplayer libcurl-devel) $(vopt_if multiplayer libressl-devel)
+ $(vopt_if multiplayer 'libcurl-devel libressl-devel')
  $(vopt_if scripting duktape-devel)"
 short_desc="Open source re-implementation of RollerCoaster Tycoon 2"
 maintainer="klardotsh <josh@klar.sh>"
