@@ -1,0 +1,50 @@
+# THIS PACKAGE IS WIP
+# files/ should be populated with the files you get from running
+# https://github.com/Celliwig/Lenovo-Yoga-c630/blob/master/yoga_fw_extract/yoga_fw_extract.sh
+#
+# as far as I know I can't just distribute these in an S3 bucket or I would
+#
+# this is an incomplete set of the firmwares. I skipped most things from L456
+# of Celliwig's script onwards as I'm most interested in getting the display
+# to, uh, turn on, then I'll worry about WiFi and sound
+
+pkgname=c630-firmware
+version=20201102
+revision=2
+archs="aarch64*"
+wrksrc="firmware-${_githash}"
+short_desc="Firmware files for the Lenovo C630 WOS (git ${_gitshort})"
+maintainer="klardotsh <josh@klar.sh>"
+license="UNLICENSED"
+homepage="https://github.com/Celliwig/Lenovo-Yoga-c630/blob/master/yoga_fw_extract/yoga_fw_extract.sh"
+#distfiles="https://github.com/raspberrypi/firmware/archive/${_githash}.tar.gz"
+#checksum=dd825e8ccbd524182f7e06c5301f2ed2f8a68200e80cf61b1095271dcfbe0e55
+
+nostrip=yes
+
+do_install() {
+	vinstall ${FILESDIR}/a630_sqe.fw 0644 usr/lib/firmware/qcom/
+	vinstall ${FILESDIR}/a630_gmu.bin 0644 usr/lib/firmware/qcom/
+
+	vinstall ${FILESDIR}/ipa_fws.b00 0644 usr/lib/firmware/
+	vinstall ${FILESDIR}/ipa_fws.b01 0644 usr/lib/firmware/
+	vinstall ${FILESDIR}/ipa_fws.b02 0644 usr/lib/firmware/
+	vinstall ${FILESDIR}/ipa_fws.b03 0644 usr/lib/firmware/
+	vinstall ${FILESDIR}/ipa_fws.b04 0644 usr/lib/firmware/
+	vinstall ${FILESDIR}/ipa_fws.mdt 0644 usr/lib/firmware/
+
+	vinstall ${FILESDIR}/venus.b00 0644 usr/lib/firmware/qcom/venus-5.2/
+	vinstall ${FILESDIR}/venus.b01 0644 usr/lib/firmware/qcom/venus-5.2/
+	vinstall ${FILESDIR}/venus.b02 0644 usr/lib/firmware/qcom/venus-5.2/
+	vinstall ${FILESDIR}/venus.b03 0644 usr/lib/firmware/qcom/venus-5.2/
+	vinstall ${FILESDIR}/venus.b04 0644 usr/lib/firmware/qcom/venus-5.2/
+	vinstall ${FILESDIR}/venus.mdt 0644 usr/lib/firmware/qcom/venus-5.2/
+
+	for ffile in adspr.jsn adspua.jsn cdspr.jsn ipa_fws.elf modemuw.jsn qcadsp850.mbn qccdsp850.mbn qcdsp1v2850.mbn qcdsp1v2850_nm.mbn qcdsp2850.mbn qcdsp2850_nm.mbn qcdxkmsuc850.mbn qcslpi850_cls.mbn qcslpi850.mbn qcvss850.mbn wlanmdsp.mbn; do
+		vinstall ${FILESDIR}/LENOVO/81JL/$ffile 0644 usr/lib/firmware/qcom/LENOVO/81JL/
+	done
+
+	vinstall ${FILESDIR}/LENOVO/81JL/modem.mdt 0644 usr/lib/firmware/qcom/LENOVO/81JL/
+
+	vinstall ${FILESDIR}/board-2.bin 0644 usr/lib/firmware/ath10k/WCN3990/hw1.0/
+}
