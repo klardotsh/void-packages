@@ -1,0 +1,53 @@
+From 097ff8343cc7306836350044b280ff8018f7df41 Mon Sep 17 00:00:00 2001
+From: Jordan Crouse <jcrouse@codeaurora.org>
+Date: Sat, 5 Sep 2020 13:04:25 -0700
+Subject: [PATCH 46/68] arm: dts: qcom: sm845: Set the compatible string for
+ the GPU SMMU
+
+Set the qcom,adreno-smmu compatible string for the GPU SMMU to enable
+split pagetables and per-instance pagetables for drm/msm.
+
+Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
+Signed-off-by: Rob Clark <robdclark@chromium.org>
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
+ arch/arm64/boot/dts/qcom/sdm845-cheza.dtsi | 9 +++++++++
+ arch/arm64/boot/dts/qcom/sdm845.dtsi       | 2 +-
+ 2 files changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/sdm845-cheza.dtsi b/arch/arm64/boot/dts/qcom/sdm845-cheza.dtsi
+index 64fc1bfd66fad..39f23cdcbd029 100644
+--- a/arch/arm64/boot/dts/qcom/sdm845-cheza.dtsi
++++ b/arch/arm64/boot/dts/qcom/sdm845-cheza.dtsi
+@@ -633,6 +633,15 @@ &mdss_mdp {
+ 	status = "okay";
+ };
+ 
++/*
++ * Cheza fw does not properly program the GPU aperture to allow the
++ * GPU to update the SMMU pagetables for context switches.  Work
++ * around this by dropping the "qcom,adreno-smmu" compat string.
++ */
++&adreno_smmu {
++	compatible = "qcom,sdm845-smmu-v2", "qcom,smmu-v2";
++};
++
+ &mss_pil {
+ 	iommus = <&apps_smmu 0x781 0x0>,
+ 		 <&apps_smmu 0x724 0x3>;
+diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+index eca81cffd2c19..72a041d59a92e 100644
+--- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
++++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+@@ -4063,7 +4063,7 @@ opp-257000000 {
+ 		};
+ 
+ 		adreno_smmu: iommu@5040000 {
+-			compatible = "qcom,sdm845-smmu-v2", "qcom,smmu-v2";
++			compatible = "qcom,sdm845-smmu-v2", "qcom,adreno-smmu", "qcom,smmu-v2";
+ 			reg = <0 0x5040000 0 0x10000>;
+ 			#iommu-cells = <1>;
+ 			#global-interrupts = <2>;
+-- 
+2.26.2
+

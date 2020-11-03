@@ -1,0 +1,43 @@
+From 8310eecc09190f31d2f499985ebb6a7b6ff25edf Mon Sep 17 00:00:00 2001
+From: Bjorn Andersson <bjorn.andersson@linaro.org>
+Date: Wed, 30 Sep 2020 17:35:31 -0500
+Subject: [PATCH 14/68] dt-bindings: drm/bridge: ti-sn65dsi86: Replace
+ #pwm-cells
+
+While the signal on GPIO4 to drive the backlight controller indeed is
+pulse width modulated its purpose is specifically to control the
+brightness of a backlight.
+
+Drop the #pwm-cells and instead expose a new property to configure the
+granularity of the backlight PWM signal.
+
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Tested-By: Steev Klimaszewski <steev@kali.org>
+Signed-off-by: Steev Klimaszewski <steev@kali.org>
+---
+ .../devicetree/bindings/display/bridge/ti,sn65dsi86.yaml | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/display/bridge/ti,sn65dsi86.yaml b/Documentation/devicetree/bindings/display/bridge/ti,sn65dsi86.yaml
+index f8622bd0f61ee..e380218b46467 100644
+--- a/Documentation/devicetree/bindings/display/bridge/ti,sn65dsi86.yaml
++++ b/Documentation/devicetree/bindings/display/bridge/ti,sn65dsi86.yaml
+@@ -66,9 +66,12 @@ properties:
+       1-based to match the datasheet.  See ../../gpio/gpio.txt for more
+       information.
+ 
+-  '#pwm-cells':
+-    const: 1
+-    description: See ../../pwm/pwm.yaml for description of the cell formats.
++  ti,backlight-scale:
++    description:
++      The granularity of brightness for the PWM signal provided on GPIO4, if
++      this property is specified.
++    minimum: 0
++    maximum: 65535
+ 
+   ports:
+     type: object
+-- 
+2.26.2
+

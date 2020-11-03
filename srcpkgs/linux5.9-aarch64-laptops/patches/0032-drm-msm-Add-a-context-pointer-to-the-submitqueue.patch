@@ -1,0 +1,160 @@
+From cbb062c8ad2d7266abda553a41e7b25f6e7f8ca4 Mon Sep 17 00:00:00 2001
+From: Jordan Crouse <jcrouse@codeaurora.org>
+Date: Sat, 5 Sep 2020 13:04:11 -0700
+Subject: [PATCH 32/68] drm/msm: Add a context pointer to the submitqueue
+
+Each submitqueue is attached to a context. Add a pointer to the
+context to the submitqueue at create time and refcount it so
+that it stays around through the life of the queue.
+
+Co-developed-by: Rob Clark <robdclark@chromium.org>
+Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
+Signed-off-by: Rob Clark <robdclark@chromium.org>
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
+ drivers/gpu/drm/msm/msm_drv.c         |  3 ++-
+ drivers/gpu/drm/msm/msm_drv.h         | 20 ++++++++++++++++++++
+ drivers/gpu/drm/msm/msm_gem.h         |  1 +
+ drivers/gpu/drm/msm/msm_gem_submit.c  |  6 +++---
+ drivers/gpu/drm/msm/msm_gpu.h         |  1 +
+ drivers/gpu/drm/msm/msm_submitqueue.c |  3 +++
+ 6 files changed, 30 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/gpu/drm/msm/msm_drv.c b/drivers/gpu/drm/msm/msm_drv.c
+index 3c15c814b0645..ba5f77ffc9d7d 100644
+--- a/drivers/gpu/drm/msm/msm_drv.c
++++ b/drivers/gpu/drm/msm/msm_drv.c
+@@ -621,6 +621,7 @@ static int context_init(struct drm_device *dev, struct drm_file *file)
+ 	if (!ctx)
+ 		return -ENOMEM;
+ 
++	kref_init(&ctx->ref);
+ 	msm_submitqueue_init(dev, ctx);
+ 
+ 	ctx->aspace = priv->gpu ? priv->gpu->aspace : NULL;
+@@ -642,7 +643,7 @@ static int msm_open(struct drm_device *dev, struct drm_file *file)
+ static void context_close(struct msm_file_private *ctx)
+ {
+ 	msm_submitqueue_close(ctx);
+-	kfree(ctx);
++	msm_file_private_put(ctx);
+ }
+ 
+ static void msm_postclose(struct drm_device *dev, struct drm_file *file)
+diff --git a/drivers/gpu/drm/msm/msm_drv.h b/drivers/gpu/drm/msm/msm_drv.h
+index 309dd28183151..9a14728d92b5d 100644
+--- a/drivers/gpu/drm/msm/msm_drv.h
++++ b/drivers/gpu/drm/msm/msm_drv.h
+@@ -57,6 +57,7 @@ struct msm_file_private {
+ 	struct list_head submitqueues;
+ 	int queueid;
+ 	struct msm_gem_address_space *aspace;
++	struct kref ref;
+ };
+ 
+ enum msm_mdp_plane_property {
+@@ -428,6 +429,25 @@ void msm_submitqueue_close(struct msm_file_private *ctx);
+ 
+ void msm_submitqueue_destroy(struct kref *kref);
+ 
++static inline void __msm_file_private_destroy(struct kref *kref)
++{
++	struct msm_file_private *ctx = container_of(kref,
++		struct msm_file_private, ref);
++
++	kfree(ctx);
++}
++
++static inline void msm_file_private_put(struct msm_file_private *ctx)
++{
++	kref_put(&ctx->ref, __msm_file_private_destroy);
++}
++
++static inline struct msm_file_private *msm_file_private_get(
++	struct msm_file_private *ctx)
++{
++	kref_get(&ctx->ref);
++	return ctx;
++}
+ 
+ #define DBG(fmt, ...) DRM_DEBUG_DRIVER(fmt"\n", ##__VA_ARGS__)
+ #define VERB(fmt, ...) if (0) DRM_DEBUG_DRIVER(fmt"\n", ##__VA_ARGS__)
+diff --git a/drivers/gpu/drm/msm/msm_gem.h b/drivers/gpu/drm/msm/msm_gem.h
+index d6f84750f3eea..1146ea4369cba 100644
+--- a/drivers/gpu/drm/msm/msm_gem.h
++++ b/drivers/gpu/drm/msm/msm_gem.h
+@@ -144,6 +144,7 @@ struct msm_gem_submit {
+ 	bool valid;         /* true if no cmdstream patching needed */
+ 	bool in_rb;         /* "sudo" mode, copy cmds into RB */
+ 	struct msm_ringbuffer *ring;
++	struct msm_file_private *ctx;
+ 	unsigned int nr_cmds;
+ 	unsigned int nr_bos;
+ 	u32 ident;	   /* A "identifier" for the submit for logging */
+diff --git a/drivers/gpu/drm/msm/msm_gem_submit.c b/drivers/gpu/drm/msm/msm_gem_submit.c
+index 8cb9aa15ff90e..1464b04d25d31 100644
+--- a/drivers/gpu/drm/msm/msm_gem_submit.c
++++ b/drivers/gpu/drm/msm/msm_gem_submit.c
+@@ -27,7 +27,7 @@
+ #define BO_PINNED   0x2000
+ 
+ static struct msm_gem_submit *submit_create(struct drm_device *dev,
+-		struct msm_gpu *gpu, struct msm_gem_address_space *aspace,
++		struct msm_gpu *gpu,
+ 		struct msm_gpu_submitqueue *queue, uint32_t nr_bos,
+ 		uint32_t nr_cmds)
+ {
+@@ -43,7 +43,7 @@ static struct msm_gem_submit *submit_create(struct drm_device *dev,
+ 		return NULL;
+ 
+ 	submit->dev = dev;
+-	submit->aspace = aspace;
++	submit->aspace = queue->ctx->aspace;
+ 	submit->gpu = gpu;
+ 	submit->fence = NULL;
+ 	submit->cmd = (void *)&submit->bos[nr_bos];
+@@ -677,7 +677,7 @@ int msm_ioctl_gem_submit(struct drm_device *dev, void *data,
+ 		}
+ 	}
+ 
+-	submit = submit_create(dev, gpu, ctx->aspace, queue, args->nr_bos,
++	submit = submit_create(dev, gpu, queue, args->nr_bos,
+ 		args->nr_cmds);
+ 	if (!submit) {
+ 		ret = -ENOMEM;
+diff --git a/drivers/gpu/drm/msm/msm_gpu.h b/drivers/gpu/drm/msm/msm_gpu.h
+index 1f65aec57a8fe..c4ce462c30c5e 100644
+--- a/drivers/gpu/drm/msm/msm_gpu.h
++++ b/drivers/gpu/drm/msm/msm_gpu.h
+@@ -193,6 +193,7 @@ struct msm_gpu_submitqueue {
+ 	u32 flags;
+ 	u32 prio;
+ 	int faults;
++	struct msm_file_private *ctx;
+ 	struct list_head node;
+ 	struct kref ref;
+ };
+diff --git a/drivers/gpu/drm/msm/msm_submitqueue.c b/drivers/gpu/drm/msm/msm_submitqueue.c
+index 90c9d84e6155a..c3d206105d285 100644
+--- a/drivers/gpu/drm/msm/msm_submitqueue.c
++++ b/drivers/gpu/drm/msm/msm_submitqueue.c
+@@ -12,6 +12,8 @@ void msm_submitqueue_destroy(struct kref *kref)
+ 	struct msm_gpu_submitqueue *queue = container_of(kref,
+ 		struct msm_gpu_submitqueue, ref);
+ 
++	msm_file_private_put(queue->ctx);
++
+ 	kfree(queue);
+ }
+ 
+@@ -83,6 +85,7 @@ int msm_submitqueue_create(struct drm_device *drm, struct msm_file_private *ctx,
+ 
+ 	write_lock(&ctx->queuelock);
+ 
++	queue->ctx = msm_file_private_get(ctx);
+ 	queue->id = ctx->queueid++;
+ 
+ 	if (id)
+-- 
+2.26.2
+

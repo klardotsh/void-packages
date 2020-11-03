@@ -1,0 +1,151 @@
+From 92c772ea3086f1a0caaee8b63aa377d01046c895 Mon Sep 17 00:00:00 2001
+From: Akhil P Oommen <akhilpo@codeaurora.org>
+Date: Tue, 22 Sep 2020 20:25:26 +0530
+Subject: [PATCH 21/68] drm/msm: Fix premature purging of BO
+
+In the case where we have a back-to-back submission that shares the same
+BO, this BO will be prematurely moved to inactive_list while retiring the
+first submit. But it will be still part of the second submit which is
+being processed by the GPU. Now, if the shrinker happens to be triggered at
+this point, it will result in a premature purging of this BO.
+
+To fix this, we need to refcount BO while doing submit and retire. Then,
+it should be moved to inactive list when this refcount becomes 0.
+
+Signed-off-by: Akhil P Oommen <akhilpo@codeaurora.org>
+Signed-off-by: Rob Clark <robdclark@chromium.org>
+---
+ drivers/gpu/drm/msm/msm_drv.h |  5 ++---
+ drivers/gpu/drm/msm/msm_gem.c | 32 ++++++++++++++++----------------
+ drivers/gpu/drm/msm/msm_gem.h |  4 +++-
+ drivers/gpu/drm/msm/msm_gpu.c | 11 +++++++----
+ 4 files changed, 28 insertions(+), 24 deletions(-)
+
+diff --git a/drivers/gpu/drm/msm/msm_drv.h b/drivers/gpu/drm/msm/msm_drv.h
+index 3be5f0592c9ab..309dd28183151 100644
+--- a/drivers/gpu/drm/msm/msm_drv.h
++++ b/drivers/gpu/drm/msm/msm_drv.h
+@@ -302,9 +302,8 @@ void msm_gem_put_vaddr(struct drm_gem_object *obj);
+ int msm_gem_madvise(struct drm_gem_object *obj, unsigned madv);
+ int msm_gem_sync_object(struct drm_gem_object *obj,
+ 		struct msm_fence_context *fctx, bool exclusive);
+-void msm_gem_move_to_active(struct drm_gem_object *obj,
+-		struct msm_gpu *gpu, bool exclusive, struct dma_fence *fence);
+-void msm_gem_move_to_inactive(struct drm_gem_object *obj);
++void msm_gem_active_get(struct drm_gem_object *obj, struct msm_gpu *gpu);
++void msm_gem_active_put(struct drm_gem_object *obj);
+ int msm_gem_cpu_prep(struct drm_gem_object *obj, uint32_t op, ktime_t *timeout);
+ int msm_gem_cpu_fini(struct drm_gem_object *obj);
+ void msm_gem_free_object(struct drm_gem_object *obj);
+diff --git a/drivers/gpu/drm/msm/msm_gem.c b/drivers/gpu/drm/msm/msm_gem.c
+index b2f49152b4d4c..1205a0aedb2be 100644
+--- a/drivers/gpu/drm/msm/msm_gem.c
++++ b/drivers/gpu/drm/msm/msm_gem.c
+@@ -753,31 +753,31 @@ int msm_gem_sync_object(struct drm_gem_object *obj,
+ 	return 0;
+ }
+ 
+-void msm_gem_move_to_active(struct drm_gem_object *obj,
+-		struct msm_gpu *gpu, bool exclusive, struct dma_fence *fence)
++void msm_gem_active_get(struct drm_gem_object *obj, struct msm_gpu *gpu)
+ {
+ 	struct msm_gem_object *msm_obj = to_msm_bo(obj);
++	WARN_ON(!mutex_is_locked(&obj->dev->struct_mutex));
+ 	WARN_ON(msm_obj->madv != MSM_MADV_WILLNEED);
+-	msm_obj->gpu = gpu;
+-	if (exclusive)
+-		dma_resv_add_excl_fence(obj->resv, fence);
+-	else
+-		dma_resv_add_shared_fence(obj->resv, fence);
+-	list_del_init(&msm_obj->mm_list);
+-	list_add_tail(&msm_obj->mm_list, &gpu->active_list);
++
++	if (!atomic_fetch_inc(&msm_obj->active_count)) {
++		msm_obj->gpu = gpu;
++		list_del_init(&msm_obj->mm_list);
++		list_add_tail(&msm_obj->mm_list, &gpu->active_list);
++	}
+ }
+ 
+-void msm_gem_move_to_inactive(struct drm_gem_object *obj)
++void msm_gem_active_put(struct drm_gem_object *obj)
+ {
+-	struct drm_device *dev = obj->dev;
+-	struct msm_drm_private *priv = dev->dev_private;
+ 	struct msm_gem_object *msm_obj = to_msm_bo(obj);
++	struct msm_drm_private *priv = obj->dev->dev_private;
+ 
+-	WARN_ON(!mutex_is_locked(&dev->struct_mutex));
++	WARN_ON(!mutex_is_locked(&obj->dev->struct_mutex));
+ 
+-	msm_obj->gpu = NULL;
+-	list_del_init(&msm_obj->mm_list);
+-	list_add_tail(&msm_obj->mm_list, &priv->inactive_list);
++	if (!atomic_dec_return(&msm_obj->active_count)) {
++		msm_obj->gpu = NULL;
++		list_del_init(&msm_obj->mm_list);
++		list_add_tail(&msm_obj->mm_list, &priv->inactive_list);
++	}
+ }
+ 
+ int msm_gem_cpu_prep(struct drm_gem_object *obj, uint32_t op, ktime_t *timeout)
+diff --git a/drivers/gpu/drm/msm/msm_gem.h b/drivers/gpu/drm/msm/msm_gem.h
+index 972490b14ba5e..d6f84750f3eea 100644
+--- a/drivers/gpu/drm/msm/msm_gem.h
++++ b/drivers/gpu/drm/msm/msm_gem.h
+@@ -83,12 +83,14 @@ struct msm_gem_object {
+ 	struct mutex lock; /* Protects resources associated with bo */
+ 
+ 	char name[32]; /* Identifier to print for the debugfs files */
++
++	atomic_t active_count;
+ };
+ #define to_msm_bo(x) container_of(x, struct msm_gem_object, base)
+ 
+ static inline bool is_active(struct msm_gem_object *msm_obj)
+ {
+-	return msm_obj->gpu != NULL;
++	return atomic_read(&msm_obj->active_count);
+ }
+ 
+ static inline bool is_purgeable(struct msm_gem_object *msm_obj)
+diff --git a/drivers/gpu/drm/msm/msm_gpu.c b/drivers/gpu/drm/msm/msm_gpu.c
+index 57ddc9438351e..d61f7c06b3c6b 100644
+--- a/drivers/gpu/drm/msm/msm_gpu.c
++++ b/drivers/gpu/drm/msm/msm_gpu.c
+@@ -694,8 +694,8 @@ static void retire_submit(struct msm_gpu *gpu, struct msm_ringbuffer *ring,
+ 
+ 	for (i = 0; i < submit->nr_bos; i++) {
+ 		struct msm_gem_object *msm_obj = submit->bos[i].obj;
+-		/* move to inactive: */
+-		msm_gem_move_to_inactive(&msm_obj->base);
++
++		msm_gem_active_put(&msm_obj->base);
+ 		msm_gem_unpin_iova(&msm_obj->base, submit->aspace);
+ 		drm_gem_object_put_locked(&msm_obj->base);
+ 	}
+@@ -771,6 +771,7 @@ void msm_gpu_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit,
+ 
+ 	for (i = 0; i < submit->nr_bos; i++) {
+ 		struct msm_gem_object *msm_obj = submit->bos[i].obj;
++		struct drm_gem_object *drm_obj = &msm_obj->base;
+ 		uint64_t iova;
+ 
+ 		/* can't happen yet.. but when we add 2d support we'll have
+@@ -783,9 +784,11 @@ void msm_gpu_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit,
+ 		msm_gem_get_and_pin_iova(&msm_obj->base, submit->aspace, &iova);
+ 
+ 		if (submit->bos[i].flags & MSM_SUBMIT_BO_WRITE)
+-			msm_gem_move_to_active(&msm_obj->base, gpu, true, submit->fence);
++			dma_resv_add_excl_fence(drm_obj->resv, submit->fence);
+ 		else if (submit->bos[i].flags & MSM_SUBMIT_BO_READ)
+-			msm_gem_move_to_active(&msm_obj->base, gpu, false, submit->fence);
++			dma_resv_add_shared_fence(drm_obj->resv, submit->fence);
++
++		msm_gem_active_get(drm_obj, gpu);
+ 	}
+ 
+ 	gpu->funcs->submit(gpu, submit, ctx);
+-- 
+2.26.2
+

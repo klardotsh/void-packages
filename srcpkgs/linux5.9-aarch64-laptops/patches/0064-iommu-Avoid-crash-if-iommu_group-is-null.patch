@@ -1,0 +1,96 @@
+From b7d23cbe1d901ba8c3ec4e185a6bb67e64169b4a Mon Sep 17 00:00:00 2001
+From: John Stultz <john.stultz@linaro.org>
+Date: Sat, 31 Oct 2020 00:37:21 +0000
+Subject: [PATCH 64/68] iommu: Avoid crash if iommu_group is null
+
+In trying to handle a possible driver probe ordering issue
+brought up by Robin Murphy, I ran across a separate null pointer
+crash in the iommu core in iommu_group_remove_device():
+[    2.732803] dwc3-qcom a6f8800.usb: failed to get usb-ddr path: -517
+[    2.739281] Unable to handle kernel NULL pointer dereference at virtual address 00000000000000c0
+...
+[    2.775619] [00000000000000c0] user address but active_mm is swapper
+[    2.782039] Internal error: Oops: 96000005 [#1] PREEMPT SMP
+[    2.787670] Modules linked in:
+[    2.790769] CPU: 6 PID: 1 Comm: swapper/0 Tainted: G        W         5.10.0-rc1-mainline-00025-g272a618fc36-dirty #3973
+[    2.801719] Hardware name: Thundercomm Dragonboard 845c (DT)
+[    2.807431] pstate: 00c00005 (nzcv daif +PAN +UAO -TCO BTYPE=--)
+[    2.813508] pc : iommu_group_remove_device+0x30/0x1b0
+[    2.818611] lr : iommu_release_device+0x4c/0x78
+[    2.823189] sp : ffffffc01005b950
+...
+[    2.907082] Call trace:
+[    2.909566]  iommu_group_remove_device+0x30/0x1b0
+[    2.914323]  iommu_release_device+0x4c/0x78
+[    2.918559]  iommu_bus_notifier+0xe8/0x108
+[    2.922708]  blocking_notifier_call_chain+0x78/0xb8
+[    2.927641]  device_del+0x2ac/0x3d0
+[    2.931177]  platform_device_del.part.9+0x20/0x98
+[    2.935933]  platform_device_unregister+0x2c/0x40
+[    2.940694]  of_platform_device_destroy+0xd8/0xe0
+[    2.945450]  device_for_each_child_reverse+0x58/0xb0
+[    2.950471]  of_platform_depopulate+0x4c/0x78
+[    2.954886]  dwc3_qcom_probe+0x93c/0xcb8
+[    2.958858]  platform_drv_probe+0x58/0xa8
+[    2.962917]  really_probe+0xec/0x398
+[    2.966531]  driver_probe_device+0x5c/0xb8
+[    2.970677]  device_driver_attach+0x74/0x98
+[    2.974911]  __driver_attach+0x60/0xe8
+[    2.978700]  bus_for_each_dev+0x84/0xd8
+[    2.982581]  driver_attach+0x30/0x40
+[    2.986194]  bus_add_driver+0x160/0x208
+[    2.990076]  driver_register+0x64/0x110
+[    2.993957]  __platform_driver_register+0x58/0x68
+[    2.998716]  dwc3_qcom_driver_init+0x20/0x28
+[    3.003041]  do_one_initcall+0x6c/0x2d0
+[    3.006925]  kernel_init_freeable+0x214/0x268
+[    3.011339]  kernel_init+0x18/0x118
+[    3.014876]  ret_from_fork+0x10/0x18
+[    3.018495] Code: d0006a21 f9417295 91130021 910162b6 (b940c2a2)
+
+In the case above, the arm-smmu driver fails to probe with
+EPROBE_DEFER, and I'm guessing I'm guessing that causes
+iommu_group_add_device() to fail and sets the
+dev->iommu_group = NULL, then somehow we hit
+iommu_group_remove_device() and trip over the null value?
+I'm not really sure...
+
+Anyway, adding the null check seems to avoid the issue and the
+system boots fine after the arm-smmu driver later reprobed.
+
+Feedback or better ideas for a solution would be appreciated!
+
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Will Deacon <will@kernel.org>
+Cc: Andy Gross <agross@kernel.org>
+Cc: Maulik Shah <mkshah@codeaurora.org>
+Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+Cc: Saravana Kannan <saravanak@google.com>
+Cc: Marc Zyngier <maz@kernel.org>
+Cc: Lina Iyer <ilina@codeaurora.org>
+Cc: iommu@lists.linux-foundation.org
+Cc: linux-arm-msm <linux-arm-msm@vger.kernel.org>
+Signed-off-by: John Stultz <john.stultz@linaro.org>
+Signed-off-by: Steev Klimaszewski <steev@kali.org>
+---
+ drivers/iommu/iommu.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index 609bd25bf154b..bbb425c2f8db6 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -877,6 +877,10 @@ void iommu_group_remove_device(struct device *dev)
+ 	struct iommu_group *group = dev->iommu_group;
+ 	struct group_device *tmp_device, *device = NULL;
+ 
++	/* Avoid crash if iommu_group value is null */
++	if (!group)
++		return;
++
+ 	dev_info(dev, "Removing from iommu group %d\n", group->id);
+ 
+ 	/* Pre-notify listeners that a device is being removed. */
+-- 
+2.26.2
+

@@ -1,0 +1,39 @@
+From 3c05630e4b3e462d7e393e36e33d7cc20302bd83 Mon Sep 17 00:00:00 2001
+From: Roja Rani Yarubandi <rojay@codeaurora.org>
+Date: Fri, 30 Oct 2020 20:29:57 +0530
+Subject: [PATCH 66/68] soc: qcom: geni: Remove "iova" check
+
+Remove "iova" check from geni_se_tx_dma_unprep and geni_se_rx_dma_unprep
+functions as checking with dma_mapping_error() is enough.
+
+Signed-off-by: Roja Rani Yarubandi <rojay@codeaurora.org>
+Signed-off-by: Steev Klimaszewski <steev@kali.org>
+---
+ drivers/soc/qcom/qcom-geni-se.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/soc/qcom/qcom-geni-se.c b/drivers/soc/qcom/qcom-geni-se.c
+index d0e4f520cff8c..0216b38c1e9a8 100644
+--- a/drivers/soc/qcom/qcom-geni-se.c
++++ b/drivers/soc/qcom/qcom-geni-se.c
+@@ -705,7 +705,7 @@ void geni_se_tx_dma_unprep(struct geni_se *se, dma_addr_t iova, size_t len)
+ {
+ 	struct geni_wrapper *wrapper = se->wrapper;
+ 
+-	if (iova && !dma_mapping_error(wrapper->dev, iova))
++	if (!dma_mapping_error(wrapper->dev, iova))
+ 		dma_unmap_single(wrapper->dev, iova, len, DMA_TO_DEVICE);
+ }
+ EXPORT_SYMBOL(geni_se_tx_dma_unprep);
+@@ -722,7 +722,7 @@ void geni_se_rx_dma_unprep(struct geni_se *se, dma_addr_t iova, size_t len)
+ {
+ 	struct geni_wrapper *wrapper = se->wrapper;
+ 
+-	if (iova && !dma_mapping_error(wrapper->dev, iova))
++	if (!dma_mapping_error(wrapper->dev, iova))
+ 		dma_unmap_single(wrapper->dev, iova, len, DMA_FROM_DEVICE);
+ }
+ EXPORT_SYMBOL(geni_se_rx_dma_unprep);
+-- 
+2.26.2
+

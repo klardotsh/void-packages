@@ -1,0 +1,75 @@
+From 67012bba9ebcf1c8f3092b0477d8f6f37392c4ff Mon Sep 17 00:00:00 2001
+From: Steev Klimaszewski <steev@kali.org>
+Date: Wed, 7 Oct 2020 11:34:56 -0500
+Subject: [PATCH 24/68] CHROMIUM: HACK: ath10k: disable thermal support for
+ wcn3990
+
+When these commands time out, they're blocking a lot of other ops for 5
+seconds.
+
+BUG=b:164183337
+TEST=ls -l /sys/class/thermal/
+
+Signed-off-by: Brian Norris <briannorris@chromium.org>
+Change-Id: Ifd6c640a9c9f746f48fb32683b0cda082d86046d
+Reviewed-on: https://chromium-review.googlesource.com/c/chromiumos/third_party/kernel/+/2451256
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
+Reviewed-by: Abhishek Kumar <kuabhs@chromium.org>
+Commit-Queue: Douglas Anderson <dianders@chromium.org>
+Tested-by: Douglas Anderson <dianders@chromium.org>
+---
+ drivers/net/wireless/ath/ath10k/core.c    | 3 +++
+ drivers/net/wireless/ath/ath10k/hw.h      | 5 +++++
+ drivers/net/wireless/ath/ath10k/thermal.c | 6 ++++++
+ 3 files changed, 14 insertions(+)
+
+diff --git a/drivers/net/wireless/ath/ath10k/core.c b/drivers/net/wireless/ath/ath10k/core.c
+index 340ce327ac148..773fbf180fdc6 100644
+--- a/drivers/net/wireless/ath/ath10k/core.c
++++ b/drivers/net/wireless/ath/ath10k/core.c
+@@ -637,6 +637,9 @@ static const struct ath10k_hw_params ath10k_hw_params_list[] = {
+ 		.hw_filter_reset_required = false,
+ 		.fw_diag_ce_download = false,
+ 		.tx_stats_over_pktlog = false,
++
++		/* HACK:  waiting for a real fix for b/164183337. */
++		.disable_thermal = true,
+ 	},
+ };
+ 
+diff --git a/drivers/net/wireless/ath/ath10k/hw.h b/drivers/net/wireless/ath/ath10k/hw.h
+index f16edcb9f3261..9c5687af4798b 100644
+--- a/drivers/net/wireless/ath/ath10k/hw.h
++++ b/drivers/net/wireless/ath/ath10k/hw.h
+@@ -624,6 +624,11 @@ struct ath10k_hw_params {
+ 	/* tx stats support over pktlog */
+ 	bool tx_stats_over_pktlog;
+ 
++	/* Disable all thermal support.
++	 * HACK: waiting for a real fix for b/164183337.
++	 */
++	bool disable_thermal;
++
+ 	/* provides bitrates for sta_statistics using WMI_TLV_PEER_STATS_INFO_EVENTID */
+ 	bool supports_peer_stats_info;
+ };
+diff --git a/drivers/net/wireless/ath/ath10k/thermal.c b/drivers/net/wireless/ath/ath10k/thermal.c
+index 36c9a1364253f..e6271be2a82a8 100644
+--- a/drivers/net/wireless/ath/ath10k/thermal.c
++++ b/drivers/net/wireless/ath/ath10k/thermal.c
+@@ -160,6 +160,12 @@ int ath10k_thermal_register(struct ath10k *ar)
+ 	if (!test_bit(WMI_SERVICE_THERM_THROT, ar->wmi.svc_map))
+ 		return 0;
+ 
++	if (ar->hw_params.disable_thermal) {
++		ath10k_warn(ar,
++			    "disabling thermal support to work around b/164183337\n");
++		return 0;
++	}
++
+ 	cdev = thermal_cooling_device_register("ath10k_thermal", ar,
+ 					       &ath10k_thermal_ops);
+ 
+-- 
+2.26.2
+

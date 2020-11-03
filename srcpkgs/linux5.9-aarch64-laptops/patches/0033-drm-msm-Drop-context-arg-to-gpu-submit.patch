@@ -1,0 +1,207 @@
+From 2c6095194202637c2d400f967e357f02c0a89764 Mon Sep 17 00:00:00 2001
+From: Jordan Crouse <jcrouse@codeaurora.org>
+Date: Sat, 5 Sep 2020 13:04:12 -0700
+Subject: [PATCH 33/68] drm/msm: Drop context arg to gpu->submit()
+
+Now that we can get the ctx from the submitqueue, the extra arg is
+redundant.
+
+Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
+[split out of previous patch to reduce churny noise]
+Signed-off-by: Rob Clark <robdclark@chromium.org>
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
+ drivers/gpu/drm/msm/adreno/a5xx_gpu.c   | 12 +++++-------
+ drivers/gpu/drm/msm/adreno/a6xx_gpu.c   |  5 ++---
+ drivers/gpu/drm/msm/adreno/adreno_gpu.c |  5 ++---
+ drivers/gpu/drm/msm/adreno/adreno_gpu.h |  3 +--
+ drivers/gpu/drm/msm/msm_gem_submit.c    |  2 +-
+ drivers/gpu/drm/msm/msm_gpu.c           |  9 ++++-----
+ drivers/gpu/drm/msm/msm_gpu.h           |  6 ++----
+ 7 files changed, 17 insertions(+), 25 deletions(-)
+
+diff --git a/drivers/gpu/drm/msm/adreno/a5xx_gpu.c b/drivers/gpu/drm/msm/adreno/a5xx_gpu.c
+index 91726da82ed67..1c0cb2f684584 100644
+--- a/drivers/gpu/drm/msm/adreno/a5xx_gpu.c
++++ b/drivers/gpu/drm/msm/adreno/a5xx_gpu.c
+@@ -43,8 +43,7 @@ static void a5xx_flush(struct msm_gpu *gpu, struct msm_ringbuffer *ring)
+ 		gpu_write(gpu, REG_A5XX_CP_RB_WPTR, wptr);
+ }
+ 
+-static void a5xx_submit_in_rb(struct msm_gpu *gpu, struct msm_gem_submit *submit,
+-	struct msm_file_private *ctx)
++static void a5xx_submit_in_rb(struct msm_gpu *gpu, struct msm_gem_submit *submit)
+ {
+ 	struct msm_drm_private *priv = gpu->dev->dev_private;
+ 	struct msm_ringbuffer *ring = submit->ring;
+@@ -57,7 +56,7 @@ static void a5xx_submit_in_rb(struct msm_gpu *gpu, struct msm_gem_submit *submit
+ 		case MSM_SUBMIT_CMD_IB_TARGET_BUF:
+ 			break;
+ 		case MSM_SUBMIT_CMD_CTX_RESTORE_BUF:
+-			if (priv->lastctx == ctx)
++			if (priv->lastctx == submit->queue->ctx)
+ 				break;
+ 			fallthrough;
+ 		case MSM_SUBMIT_CMD_BUF:
+@@ -103,8 +102,7 @@ static void a5xx_submit_in_rb(struct msm_gpu *gpu, struct msm_gem_submit *submit
+ 	msm_gpu_retire(gpu);
+ }
+ 
+-static void a5xx_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit,
+-	struct msm_file_private *ctx)
++static void a5xx_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit)
+ {
+ 	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
+ 	struct a5xx_gpu *a5xx_gpu = to_a5xx_gpu(adreno_gpu);
+@@ -114,7 +112,7 @@ static void a5xx_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit,
+ 
+ 	if (IS_ENABLED(CONFIG_DRM_MSM_GPU_SUDO) && submit->in_rb) {
+ 		priv->lastctx = NULL;
+-		a5xx_submit_in_rb(gpu, submit, ctx);
++		a5xx_submit_in_rb(gpu, submit);
+ 		return;
+ 	}
+ 
+@@ -148,7 +146,7 @@ static void a5xx_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit,
+ 		case MSM_SUBMIT_CMD_IB_TARGET_BUF:
+ 			break;
+ 		case MSM_SUBMIT_CMD_CTX_RESTORE_BUF:
+-			if (priv->lastctx == ctx)
++			if (priv->lastctx == submit->queue->ctx)
+ 				break;
+ 			fallthrough;
+ 		case MSM_SUBMIT_CMD_BUF:
+diff --git a/drivers/gpu/drm/msm/adreno/a6xx_gpu.c b/drivers/gpu/drm/msm/adreno/a6xx_gpu.c
+index 456d729c81c39..163cfcbd8d413 100644
+--- a/drivers/gpu/drm/msm/adreno/a6xx_gpu.c
++++ b/drivers/gpu/drm/msm/adreno/a6xx_gpu.c
+@@ -81,8 +81,7 @@ static void get_stats_counter(struct msm_ringbuffer *ring, u32 counter,
+ 	OUT_RING(ring, upper_32_bits(iova));
+ }
+ 
+-static void a6xx_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit,
+-	struct msm_file_private *ctx)
++static void a6xx_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit)
+ {
+ 	unsigned int index = submit->seqno % MSM_GPU_SUBMIT_STATS_COUNT;
+ 	struct msm_drm_private *priv = gpu->dev->dev_private;
+@@ -115,7 +114,7 @@ static void a6xx_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit,
+ 		case MSM_SUBMIT_CMD_IB_TARGET_BUF:
+ 			break;
+ 		case MSM_SUBMIT_CMD_CTX_RESTORE_BUF:
+-			if (priv->lastctx == ctx)
++			if (priv->lastctx == submit->queue->ctx)
+ 				break;
+ 			fallthrough;
+ 		case MSM_SUBMIT_CMD_BUF:
+diff --git a/drivers/gpu/drm/msm/adreno/adreno_gpu.c b/drivers/gpu/drm/msm/adreno/adreno_gpu.c
+index 6e8bef1a9ea25..a2dadb38c121d 100644
+--- a/drivers/gpu/drm/msm/adreno/adreno_gpu.c
++++ b/drivers/gpu/drm/msm/adreno/adreno_gpu.c
+@@ -440,8 +440,7 @@ void adreno_recover(struct msm_gpu *gpu)
+ 	}
+ }
+ 
+-void adreno_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit,
+-		struct msm_file_private *ctx)
++void adreno_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit)
+ {
+ 	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
+ 	struct msm_drm_private *priv = gpu->dev->dev_private;
+@@ -455,7 +454,7 @@ void adreno_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit,
+ 			break;
+ 		case MSM_SUBMIT_CMD_CTX_RESTORE_BUF:
+ 			/* ignore if there has not been a ctx switch: */
+-			if (priv->lastctx == ctx)
++			if (priv->lastctx == submit->queue->ctx)
+ 				break;
+ 			fallthrough;
+ 		case MSM_SUBMIT_CMD_BUF:
+diff --git a/drivers/gpu/drm/msm/adreno/adreno_gpu.h b/drivers/gpu/drm/msm/adreno/adreno_gpu.h
+index e55abae365b5a..848632758450c 100644
+--- a/drivers/gpu/drm/msm/adreno/adreno_gpu.h
++++ b/drivers/gpu/drm/msm/adreno/adreno_gpu.h
+@@ -269,8 +269,7 @@ struct drm_gem_object *adreno_fw_create_bo(struct msm_gpu *gpu,
+ 		const struct firmware *fw, u64 *iova);
+ int adreno_hw_init(struct msm_gpu *gpu);
+ void adreno_recover(struct msm_gpu *gpu);
+-void adreno_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit,
+-		struct msm_file_private *ctx);
++void adreno_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit);
+ void adreno_flush(struct msm_gpu *gpu, struct msm_ringbuffer *ring);
+ bool adreno_idle(struct msm_gpu *gpu, struct msm_ringbuffer *ring);
+ #if defined(CONFIG_DEBUG_FS) || defined(CONFIG_DEV_COREDUMP)
+diff --git a/drivers/gpu/drm/msm/msm_gem_submit.c b/drivers/gpu/drm/msm/msm_gem_submit.c
+index 1464b04d25d31..aa5c60a7132d8 100644
+--- a/drivers/gpu/drm/msm/msm_gem_submit.c
++++ b/drivers/gpu/drm/msm/msm_gem_submit.c
+@@ -785,7 +785,7 @@ int msm_ioctl_gem_submit(struct drm_device *dev, void *data,
+ 		}
+ 	}
+ 
+-	msm_gpu_submit(gpu, submit, ctx);
++	msm_gpu_submit(gpu, submit);
+ 
+ 	args->fence = submit->fence->seqno;
+ 
+diff --git a/drivers/gpu/drm/msm/msm_gpu.c b/drivers/gpu/drm/msm/msm_gpu.c
+index 4b531e4760054..18e629f78a9f1 100644
+--- a/drivers/gpu/drm/msm/msm_gpu.c
++++ b/drivers/gpu/drm/msm/msm_gpu.c
+@@ -520,7 +520,7 @@ static void recover_worker(struct work_struct *work)
+ 			struct msm_ringbuffer *ring = gpu->rb[i];
+ 
+ 			list_for_each_entry(submit, &ring->submits, node)
+-				gpu->funcs->submit(gpu, submit, NULL);
++				gpu->funcs->submit(gpu, submit);
+ 		}
+ 	}
+ 
+@@ -747,8 +747,7 @@ void msm_gpu_retire(struct msm_gpu *gpu)
+ }
+ 
+ /* add bo's to gpu's ring, and kick gpu: */
+-void msm_gpu_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit,
+-		struct msm_file_private *ctx)
++void msm_gpu_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit)
+ {
+ 	struct drm_device *dev = gpu->dev;
+ 	struct msm_drm_private *priv = dev->dev_private;
+@@ -791,8 +790,8 @@ void msm_gpu_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit,
+ 		msm_gem_active_get(drm_obj, gpu);
+ 	}
+ 
+-	gpu->funcs->submit(gpu, submit, ctx);
+-	priv->lastctx = ctx;
++	gpu->funcs->submit(gpu, submit);
++	priv->lastctx = submit->queue->ctx;
+ 
+ 	hangcheck_timer_reset(gpu);
+ }
+diff --git a/drivers/gpu/drm/msm/msm_gpu.h b/drivers/gpu/drm/msm/msm_gpu.h
+index c4ce462c30c5e..5cf696169f934 100644
+--- a/drivers/gpu/drm/msm/msm_gpu.h
++++ b/drivers/gpu/drm/msm/msm_gpu.h
+@@ -46,8 +46,7 @@ struct msm_gpu_funcs {
+ 	int (*hw_init)(struct msm_gpu *gpu);
+ 	int (*pm_suspend)(struct msm_gpu *gpu);
+ 	int (*pm_resume)(struct msm_gpu *gpu);
+-	void (*submit)(struct msm_gpu *gpu, struct msm_gem_submit *submit,
+-			struct msm_file_private *ctx);
++	void (*submit)(struct msm_gpu *gpu, struct msm_gem_submit *submit);
+ 	void (*flush)(struct msm_gpu *gpu, struct msm_ringbuffer *ring);
+ 	irqreturn_t (*irq)(struct msm_gpu *irq);
+ 	struct msm_ringbuffer *(*active_ring)(struct msm_gpu *gpu);
+@@ -293,8 +292,7 @@ int msm_gpu_perfcntr_sample(struct msm_gpu *gpu, uint32_t *activetime,
+ 		uint32_t *totaltime, uint32_t ncntrs, uint32_t *cntrs);
+ 
+ void msm_gpu_retire(struct msm_gpu *gpu);
+-void msm_gpu_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit,
+-		struct msm_file_private *ctx);
++void msm_gpu_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit);
+ 
+ int msm_gpu_init(struct drm_device *drm, struct platform_device *pdev,
+ 		struct msm_gpu *gpu, const struct msm_gpu_funcs *funcs,
+-- 
+2.26.2
+

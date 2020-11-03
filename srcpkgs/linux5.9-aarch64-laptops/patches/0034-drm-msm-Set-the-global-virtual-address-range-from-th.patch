@@ -1,0 +1,77 @@
+From 5e00c78ad77e609147441383fb8a971566c72e99 Mon Sep 17 00:00:00 2001
+From: Jordan Crouse <jcrouse@codeaurora.org>
+Date: Sat, 5 Sep 2020 13:04:13 -0700
+Subject: [PATCH 34/68] drm/msm: Set the global virtual address range from the
+ IOMMU domain
+
+Use the aperture settings from the IOMMU domain to set up the virtual
+address range for the GPU. This allows us to transparently deal with
+IOMMU side features (like split pagetables).
+
+Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
+Signed-off-by: Rob Clark <robdclark@chromium.org>
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
+ drivers/gpu/drm/msm/adreno/adreno_gpu.c | 13 +++++++++++--
+ drivers/gpu/drm/msm/msm_iommu.c         |  7 +++++++
+ 2 files changed, 18 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/msm/adreno/adreno_gpu.c b/drivers/gpu/drm/msm/adreno/adreno_gpu.c
+index a2dadb38c121d..36c69a25dd250 100644
+--- a/drivers/gpu/drm/msm/adreno/adreno_gpu.c
++++ b/drivers/gpu/drm/msm/adreno/adreno_gpu.c
+@@ -192,6 +192,7 @@ adreno_iommu_create_address_space(struct msm_gpu *gpu,
+ 	struct iommu_domain *iommu;
+ 	struct msm_mmu *mmu;
+ 	struct msm_gem_address_space *aspace;
++	u64 start, size;
+ 
+ 	iommu = iommu_domain_alloc(&platform_bus_type);
+ 	if (!iommu)
+@@ -199,8 +200,16 @@ adreno_iommu_create_address_space(struct msm_gpu *gpu,
+ 
+ 	mmu = msm_iommu_new(&pdev->dev, iommu);
+ 
+-	aspace = msm_gem_address_space_create(mmu, "gpu", SZ_16M,
+-		0xffffffff - SZ_16M);
++	/*
++	 * Use the aperture start or SZ_16M, whichever is greater. This will
++	 * ensure that we align with the allocated pagetable range while still
++	 * allowing room in the lower 32 bits for GMEM and whatnot
++	 */
++	start = max_t(u64, SZ_16M, iommu->geometry.aperture_start);
++	size = iommu->geometry.aperture_end - start + 1;
++
++	aspace = msm_gem_address_space_create(mmu, "gpu",
++		start & GENMASK(48, 0), size);
+ 
+ 	if (IS_ERR(aspace) && !IS_ERR(mmu))
+ 		mmu->funcs->destroy(mmu);
+diff --git a/drivers/gpu/drm/msm/msm_iommu.c b/drivers/gpu/drm/msm/msm_iommu.c
+index 3a381a9674c92..1b6635504069a 100644
+--- a/drivers/gpu/drm/msm/msm_iommu.c
++++ b/drivers/gpu/drm/msm/msm_iommu.c
+@@ -36,6 +36,10 @@ static int msm_iommu_map(struct msm_mmu *mmu, uint64_t iova,
+ 	struct msm_iommu *iommu = to_msm_iommu(mmu);
+ 	size_t ret;
+ 
++	/* The arm-smmu driver expects the addresses to be sign extended */
++	if (iova & BIT_ULL(48))
++		iova |= GENMASK_ULL(63, 49);
++
+ 	ret = iommu_map_sg(iommu->domain, iova, sgt->sgl, sgt->nents, prot);
+ 	WARN_ON(!ret);
+ 
+@@ -46,6 +50,9 @@ static int msm_iommu_unmap(struct msm_mmu *mmu, uint64_t iova, size_t len)
+ {
+ 	struct msm_iommu *iommu = to_msm_iommu(mmu);
+ 
++	if (iova & BIT_ULL(48))
++		iova |= GENMASK_ULL(63, 49);
++
+ 	iommu_unmap(iommu->domain, iova, len);
+ 
+ 	return 0;
+-- 
+2.26.2
+

@@ -1,0 +1,35 @@
+From 74657d29bf2403afba7761b6ca132d935208f4b2 Mon Sep 17 00:00:00 2001
+From: Rob Clark <robdclark@chromium.org>
+Date: Sat, 5 Sep 2020 13:04:07 -0700
+Subject: [PATCH 28/68] drm/msm: Remove dangling submitqueue references
+
+Currently it doesn't matter, since we free the ctx immediately.  But
+when we start refcnt'ing the ctx, we don't want old dangling list
+entries to hang around.
+
+Signed-off-by: Rob Clark <robdclark@chromium.org>
+Reviewed-by: Jordan Crouse <jcrouse@codeaurora.org>
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
+ drivers/gpu/drm/msm/msm_submitqueue.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/msm/msm_submitqueue.c b/drivers/gpu/drm/msm/msm_submitqueue.c
+index a1d94be7883a0..90c9d84e6155a 100644
+--- a/drivers/gpu/drm/msm/msm_submitqueue.c
++++ b/drivers/gpu/drm/msm/msm_submitqueue.c
+@@ -49,8 +49,10 @@ void msm_submitqueue_close(struct msm_file_private *ctx)
+ 	 * No lock needed in close and there won't
+ 	 * be any more user ioctls coming our way
+ 	 */
+-	list_for_each_entry_safe(entry, tmp, &ctx->submitqueues, node)
++	list_for_each_entry_safe(entry, tmp, &ctx->submitqueues, node) {
++		list_del(&entry->node);
+ 		msm_submitqueue_put(entry);
++	}
+ }
+ 
+ int msm_submitqueue_create(struct drm_device *drm, struct msm_file_private *ctx,
+-- 
+2.26.2
+

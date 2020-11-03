@@ -1,0 +1,76 @@
+From 87f267dfb35e2709dce7c1fdb8c65196b231d7b7 Mon Sep 17 00:00:00 2001
+From: Rajendra Nayak <rnayak@codeaurora.org>
+Date: Tue, 1 Sep 2020 19:50:25 +0530
+Subject: [PATCH 59/68] arm64: dts: sdm845: Add OPP tables and power-domains
+ for venus
+
+Add the OPP tables in order to be able to vote on the performance state of
+a power-domain.
+
+Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+Signed-off-by: Steev Klimaszewski <steev@kali.org>
+---
+ arch/arm64/boot/dts/qcom/sdm845.dtsi | 40 ++++++++++++++++++++++++++--
+ 1 file changed, 38 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+index 72a041d59a92e..2c293b75e55a9 100644
+--- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
++++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+@@ -3644,8 +3644,10 @@ venus: video-codec@aa00000 {
+ 			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
+ 			power-domains = <&videocc VENUS_GDSC>,
+ 					<&videocc VCODEC0_GDSC>,
+-					<&videocc VCODEC1_GDSC>;
+-			power-domain-names = "venus", "vcodec0", "vcodec1";
++					<&videocc VCODEC1_GDSC>,
++					<&rpmhpd SDM845_CX>;
++			power-domain-names = "venus", "vcodec0", "vcodec1", "cx";
++			operating-points-v2 = <&venus_opp_table>;
+ 			clocks = <&videocc VIDEO_CC_VENUS_CTL_CORE_CLK>,
+ 				 <&videocc VIDEO_CC_VENUS_AHB_CLK>,
+ 				 <&videocc VIDEO_CC_VENUS_CTL_AXI_CLK>,
+@@ -3667,6 +3669,40 @@ video-core0 {
+ 			video-core1 {
+ 				compatible = "venus-encoder";
+ 			};
++
++			venus_opp_table: venus-opp-table {
++				compatible = "operating-points-v2";
++
++				opp-100000000 {
++					opp-hz = /bits/ 64 <100000000>;
++					required-opps = <&rpmhpd_opp_min_svs>;
++				};
++
++				opp-200000000 {
++					opp-hz = /bits/ 64 <200000000>;
++					required-opps = <&rpmhpd_opp_low_svs>;
++				};
++
++				opp-320000000 {
++					opp-hz = /bits/ 64 <320000000>;
++					required-opps = <&rpmhpd_opp_svs>;
++				};
++
++				opp-380000000 {
++					opp-hz = /bits/ 64 <380000000>;
++					required-opps = <&rpmhpd_opp_svs_l1>;
++				};
++
++				opp-444000000 {
++					opp-hz = /bits/ 64 <444000000>;
++					required-opps = <&rpmhpd_opp_nom>;
++				};
++
++				opp-533000097 {
++					opp-hz = /bits/ 64 <533000097>;
++					required-opps = <&rpmhpd_opp_turbo>;
++				};
++			};
+ 		};
+ 
+ 		videocc: clock-controller@ab00000 {
+-- 
+2.26.2
+

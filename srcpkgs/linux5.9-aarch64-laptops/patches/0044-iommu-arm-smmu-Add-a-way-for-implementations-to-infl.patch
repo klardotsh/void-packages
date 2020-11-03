@@ -1,0 +1,74 @@
+From 11d085c53988777224184a5c128913fbd8bcdf57 Mon Sep 17 00:00:00 2001
+From: Rob Clark <robdclark@chromium.org>
+Date: Sat, 5 Sep 2020 13:04:23 -0700
+Subject: [PATCH 44/68] iommu/arm-smmu: Add a way for implementations to
+ influence SCTLR
+
+For the Adreno GPU's SMMU, we want SCTLR.HUPCF set to ensure that
+pending translations are not terminated on iova fault.  Otherwise
+a terminated CP read could hang the GPU by returning invalid
+command-stream data.
+
+Signed-off-by: Rob Clark <robdclark@chromium.org>
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
+ drivers/iommu/arm/arm-smmu/arm-smmu-qcom.c | 6 ++++++
+ drivers/iommu/arm/arm-smmu/arm-smmu.c      | 3 +++
+ drivers/iommu/arm/arm-smmu/arm-smmu.h      | 3 +++
+ 3 files changed, 12 insertions(+)
+
+diff --git a/drivers/iommu/arm/arm-smmu/arm-smmu-qcom.c b/drivers/iommu/arm/arm-smmu/arm-smmu-qcom.c
+index 1e942eed2dfc3..0663d7d26908f 100644
+--- a/drivers/iommu/arm/arm-smmu/arm-smmu-qcom.c
++++ b/drivers/iommu/arm/arm-smmu/arm-smmu-qcom.c
+@@ -129,6 +129,12 @@ static int qcom_adreno_smmu_init_context(struct arm_smmu_domain *smmu_domain,
+ 	    (smmu_domain->cfg.fmt == ARM_SMMU_CTX_FMT_AARCH64))
+ 		pgtbl_cfg->quirks |= IO_PGTABLE_QUIRK_ARM_TTBR1;
+ 
++	/*
++	 * On the GPU device we want to process subsequent transactions after a
++	 * fault to keep the GPU from hanging
++	 */
++	smmu_domain->cfg.sctlr_set |= ARM_SMMU_SCTLR_HUPCF;
++
+ 	/*
+ 	 * Initialize private interface with GPU:
+ 	 */
+diff --git a/drivers/iommu/arm/arm-smmu/arm-smmu.c b/drivers/iommu/arm/arm-smmu/arm-smmu.c
+index 9efc67f909fb2..ac3771bb245ac 100644
+--- a/drivers/iommu/arm/arm-smmu/arm-smmu.c
++++ b/drivers/iommu/arm/arm-smmu/arm-smmu.c
+@@ -618,6 +618,9 @@ void arm_smmu_write_context_bank(struct arm_smmu_device *smmu, int idx)
+ 	if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN))
+ 		reg |= ARM_SMMU_SCTLR_E;
+ 
++	reg |= cfg->sctlr_set;
++	reg &= ~cfg->sctlr_clr;
++
+ 	arm_smmu_cb_write(smmu, idx, ARM_SMMU_CB_SCTLR, reg);
+ }
+ 
+diff --git a/drivers/iommu/arm/arm-smmu/arm-smmu.h b/drivers/iommu/arm/arm-smmu/arm-smmu.h
+index 6d47cfad80d63..5f6cdc328e491 100644
+--- a/drivers/iommu/arm/arm-smmu/arm-smmu.h
++++ b/drivers/iommu/arm/arm-smmu/arm-smmu.h
+@@ -145,6 +145,7 @@ enum arm_smmu_cbar_type {
+ #define ARM_SMMU_SCTLR_S1_ASIDPNE	BIT(12)
+ #define ARM_SMMU_SCTLR_HUPCF		BIT(8)
+ #define ARM_SMMU_SCTLR_CFCFG		BIT(7)
++#define ARM_SMMU_SCTLR_HUPCF		BIT(8)
+ #define ARM_SMMU_SCTLR_CFIE		BIT(6)
+ #define ARM_SMMU_SCTLR_CFRE		BIT(5)
+ #define ARM_SMMU_SCTLR_E		BIT(4)
+@@ -342,6 +343,8 @@ struct arm_smmu_cfg {
+ 		u16			asid;
+ 		u16			vmid;
+ 	};
++	u32				sctlr_set;    /* extra bits to set in SCTLR */
++	u32				sctlr_clr;    /* bits to mask in SCTLR */
+ 	enum arm_smmu_cbar_type		cbar;
+ 	enum arm_smmu_context_fmt	fmt;
+ };
+-- 
+2.26.2
+

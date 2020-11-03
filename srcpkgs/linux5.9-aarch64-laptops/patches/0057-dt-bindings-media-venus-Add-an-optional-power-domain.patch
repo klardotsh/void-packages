@@ -1,0 +1,70 @@
+From 7acfbf9f1a0a7e9997a853122f971507d15e8f9d Mon Sep 17 00:00:00 2001
+From: Rajendra Nayak <rnayak@codeaurora.org>
+Date: Tue, 1 Sep 2020 19:50:22 +0530
+Subject: [PATCH 57/68] dt-bindings: media: venus: Add an optional power domain
+ for perf voting
+
+Venus needs to vote for the performance state of a power domain (cx)
+to be able to support DVFS. This 'cx' power domain is controlled by
+rpmh and is a common power domain (scalable) not specific to
+venus alone. This is optional in the sense that, leaving this power
+domain out does not really impact the functionality but just makes
+the platform a little less power efficient.
+
+Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Signed-off-by: Steev Klimaszewski <steev@kali.org>
+---
+ .../devicetree/bindings/media/qcom,sc7180-venus.yaml        | 6 +++++-
+ .../devicetree/bindings/media/qcom,sdm845-venus-v2.yaml     | 6 +++++-
+ 2 files changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/media/qcom,sc7180-venus.yaml b/Documentation/devicetree/bindings/media/qcom,sc7180-venus.yaml
+index 55f2d67ae34e1..04e303b12638f 100644
+--- a/Documentation/devicetree/bindings/media/qcom,sc7180-venus.yaml
++++ b/Documentation/devicetree/bindings/media/qcom,sc7180-venus.yaml
+@@ -25,12 +25,16 @@ properties:
+     maxItems: 1
+ 
+   power-domains:
+-    maxItems: 2
++    minItems: 2
++    maxItems: 3
+ 
+   power-domain-names:
++    minItems: 2
++    maxItems: 3
+     items:
+       - const: venus
+       - const: vcodec0
++      - const: cx
+ 
+   clocks:
+     maxItems: 5
+diff --git a/Documentation/devicetree/bindings/media/qcom,sdm845-venus-v2.yaml b/Documentation/devicetree/bindings/media/qcom,sdm845-venus-v2.yaml
+index 157dff8057e95..90013d4b6b930 100644
+--- a/Documentation/devicetree/bindings/media/qcom,sdm845-venus-v2.yaml
++++ b/Documentation/devicetree/bindings/media/qcom,sdm845-venus-v2.yaml
+@@ -25,13 +25,17 @@ properties:
+     maxItems: 1
+ 
+   power-domains:
+-    maxItems: 3
++    minItems: 3
++    maxItems: 4
+ 
+   power-domain-names:
++    minItems: 3
++    maxItems: 4
+     items:
+       - const: venus
+       - const: vcodec0
+       - const: vcodec1
++      - const: cx
+ 
+   clocks:
+     maxItems: 7
+-- 
+2.26.2
+

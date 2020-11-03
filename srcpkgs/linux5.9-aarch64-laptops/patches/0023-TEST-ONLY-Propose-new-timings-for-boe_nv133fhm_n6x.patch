@@ -1,0 +1,30 @@
+From 27d38d553b7997ac49392b22f306a8bd342a4ce2 Mon Sep 17 00:00:00 2001
+From: Doug Anderson <dianders@chromium.org>
+Date: Sun, 12 Jul 2020 12:47:01 -0500
+Subject: [PATCH 23/68] TEST-ONLY: Propose new timings for boe_nv133fhm_n6x
+
+---
+ drivers/gpu/drm/panel/panel-simple.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+index eabc9e41d92b4..097d070aeea3b 100644
+--- a/drivers/gpu/drm/panel/panel-simple.c
++++ b/drivers/gpu/drm/panel/panel-simple.c
+@@ -1239,11 +1239,11 @@ static const struct panel_desc boe_nv101wxmn51 = {
+ 
+ /* Also used for boe_nv133fhm_n62 */
+ static const struct drm_display_mode boe_nv133fhm_n61_modes = {
+-	.clock = 147840,
++	.clock = 143000,
+ 	.hdisplay = 1920,
+ 	.hsync_start = 1920 + 48,
+ 	.hsync_end = 1920 + 48 + 32,
+-	.htotal = 1920 + 48 + 32 + 200,
++	.htotal = 1920 + 48 + 32 + 128,
+ 	.vdisplay = 1080,
+ 	.vsync_start = 1080 + 3,
+ 	.vsync_end = 1080 + 3 + 6,
+-- 
+2.26.2
+

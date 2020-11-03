@@ -1,0 +1,45 @@
+From 54135da5a24189a9689d15b535eee981544c04b0 Mon Sep 17 00:00:00 2001
+From: Rob Clark <robdclark@chromium.org>
+Date: Sat, 5 Sep 2020 13:04:21 -0700
+Subject: [PATCH 42/68] iommu/arm-smmu: Constify some helpers
+
+Sprinkle a few `const`s where helpers don't need write access.
+
+Signed-off-by: Rob Clark <robdclark@chromium.org>
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
+ drivers/iommu/arm/arm-smmu/arm-smmu.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/iommu/arm/arm-smmu/arm-smmu.h b/drivers/iommu/arm/arm-smmu/arm-smmu.h
+index bb4d58c4017bf..e1685ab7faafa 100644
+--- a/drivers/iommu/arm/arm-smmu/arm-smmu.h
++++ b/drivers/iommu/arm/arm-smmu/arm-smmu.h
+@@ -378,7 +378,7 @@ struct arm_smmu_master_cfg {
+ 	s16				smendx[];
+ };
+ 
+-static inline u32 arm_smmu_lpae_tcr(struct io_pgtable_cfg *cfg)
++static inline u32 arm_smmu_lpae_tcr(const struct io_pgtable_cfg *cfg)
+ {
+ 	u32 tcr = FIELD_PREP(ARM_SMMU_TCR_TG0, cfg->arm_lpae_s1_cfg.tcr.tg) |
+ 		FIELD_PREP(ARM_SMMU_TCR_SH0, cfg->arm_lpae_s1_cfg.tcr.sh) |
+@@ -399,13 +399,13 @@ static inline u32 arm_smmu_lpae_tcr(struct io_pgtable_cfg *cfg)
+ 	return tcr;
+ }
+ 
+-static inline u32 arm_smmu_lpae_tcr2(struct io_pgtable_cfg *cfg)
++static inline u32 arm_smmu_lpae_tcr2(const struct io_pgtable_cfg *cfg)
+ {
+ 	return FIELD_PREP(ARM_SMMU_TCR2_PASIZE, cfg->arm_lpae_s1_cfg.tcr.ips) |
+ 	       FIELD_PREP(ARM_SMMU_TCR2_SEP, ARM_SMMU_TCR2_SEP_UPSTREAM);
+ }
+ 
+-static inline u32 arm_smmu_lpae_vtcr(struct io_pgtable_cfg *cfg)
++static inline u32 arm_smmu_lpae_vtcr(const struct io_pgtable_cfg *cfg)
+ {
+ 	return ARM_SMMU_VTCR_RES1 |
+ 	       FIELD_PREP(ARM_SMMU_VTCR_PS, cfg->arm_lpae_s2_cfg.vtcr.ps) |
+-- 
+2.26.2
+

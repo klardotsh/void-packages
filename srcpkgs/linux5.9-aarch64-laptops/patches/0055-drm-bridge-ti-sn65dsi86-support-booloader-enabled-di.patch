@@ -1,0 +1,61 @@
+From 40efc6834b3e904cc0fc71e7bb1a7b0367ab1129 Mon Sep 17 00:00:00 2001
+From: Rob Clark <robdclark@chromium.org>
+Date: Sat, 24 Oct 2020 23:59:20 -0500
+Subject: [PATCH 55/68] drm/bridge: ti-sn65dsi86: support booloader enabled
+ display
+
+Request the enable gpio ASIS to avoid disabling bridge during probe, if
+already enabled.  And if already enabled, defer enabling runpm until
+attach to avoid cutting off the power to the bridge.
+
+Once we get to attach, we know panel and drm driver are probed
+successfully, so at this point it is safe to enable runpm and reset the
+bridge.  If we do it earlier, we kill efifb (in the case that panel or
+drm driver do not probe successfully), giving the user no way to see
+what is going on.
+
+Signed-off-by: Rob Clark <robdclark@chromium.org>
+---
+ drivers/gpu/drm/bridge/ti-sn65dsi86.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/bridge/ti-sn65dsi86.c b/drivers/gpu/drm/bridge/ti-sn65dsi86.c
+index 15cd945411dc7..86178e2ea0ad6 100644
+--- a/drivers/gpu/drm/bridge/ti-sn65dsi86.c
++++ b/drivers/gpu/drm/bridge/ti-sn65dsi86.c
+@@ -405,6 +405,12 @@ static int ti_sn_bridge_attach(struct drm_bridge *bridge,
+ 		return -EINVAL;
+ 	}
+ 
++	if (gpiod_get_value(pdata->enable_gpio)) {
++		pm_runtime_enable(pdata->dev);
++		ti_sn_bridge_resume(pdata->dev);
++		ti_sn_bridge_suspend(pdata->dev);
++	}
++
+ 	ret = drm_connector_init(bridge->dev, &pdata->connector,
+ 				 &ti_sn_bridge_connector_funcs,
+ 				 DRM_MODE_CONNECTOR_eDP);
+@@ -1341,7 +1347,7 @@ static int ti_sn_bridge_probe(struct i2c_client *client,
+ 	dev_set_drvdata(&client->dev, pdata);
+ 
+ 	pdata->enable_gpio = devm_gpiod_get(pdata->dev, "enable",
+-					    GPIOD_OUT_LOW);
++					    GPIOD_ASIS);
+ 	if (IS_ERR(pdata->enable_gpio)) {
+ 		DRM_ERROR("failed to get enable gpio from DT\n");
+ 		ret = PTR_ERR(pdata->enable_gpio);
+@@ -1369,7 +1375,9 @@ static int ti_sn_bridge_probe(struct i2c_client *client,
+ 	if (ret)
+ 		return ret;
+ 
+-	pm_runtime_enable(pdata->dev);
++	if (!gpiod_get_value(pdata->enable_gpio)) {
++		pm_runtime_enable(pdata->dev);
++	}
+ 
+ 	ret = ti_sn_backlight_init(pdata);
+ 	if (ret) {
+-- 
+2.26.2
+

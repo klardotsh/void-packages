@@ -1,0 +1,61 @@
+From 0f373545cc1d3ae442ffe9d526ca818c427ba259 Mon Sep 17 00:00:00 2001
+From: Bjorn Andersson <bjorn.andersson@linaro.org>
+Date: Mon, 19 Oct 2020 11:23:21 -0700
+Subject: [PATCH 48/68] iommu/arm-smmu: Allow implementation specific
+ write_s2cr
+
+The firmware found in some Qualcomm platforms intercepts writes to the
+S2CR register in order to replace the BYPASS type with FAULT. Further
+more it treats faults at this level as catastrophic and restarts the
+device.
+
+Add support for providing implementation specific versions of the S2CR
+write function, to allow the Qualcomm driver to work around this
+behavior.
+
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/arm/arm-smmu/arm-smmu.c | 13 ++++++++++---
+ drivers/iommu/arm/arm-smmu/arm-smmu.h |  1 +
+ 2 files changed, 11 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/iommu/arm/arm-smmu/arm-smmu.c b/drivers/iommu/arm/arm-smmu/arm-smmu.c
+index ac3771bb245ac..f0941f8d57c2b 100644
+--- a/drivers/iommu/arm/arm-smmu/arm-smmu.c
++++ b/drivers/iommu/arm/arm-smmu/arm-smmu.c
+@@ -933,9 +933,16 @@ static void arm_smmu_write_smr(struct arm_smmu_device *smmu, int idx)
+ static void arm_smmu_write_s2cr(struct arm_smmu_device *smmu, int idx)
+ {
+ 	struct arm_smmu_s2cr *s2cr = smmu->s2crs + idx;
+-	u32 reg = FIELD_PREP(ARM_SMMU_S2CR_TYPE, s2cr->type) |
+-		  FIELD_PREP(ARM_SMMU_S2CR_CBNDX, s2cr->cbndx) |
+-		  FIELD_PREP(ARM_SMMU_S2CR_PRIVCFG, s2cr->privcfg);
++	u32 reg;
++
++	if (smmu->impl && smmu->impl->write_s2cr) {
++		smmu->impl->write_s2cr(smmu, idx);
++		return;
++	}
++
++	reg = FIELD_PREP(ARM_SMMU_S2CR_TYPE, s2cr->type) |
++	      FIELD_PREP(ARM_SMMU_S2CR_CBNDX, s2cr->cbndx) |
++	      FIELD_PREP(ARM_SMMU_S2CR_PRIVCFG, s2cr->privcfg);
+ 
+ 	if (smmu->features & ARM_SMMU_FEAT_EXIDS && smmu->smrs &&
+ 	    smmu->smrs[idx].valid)
+diff --git a/drivers/iommu/arm/arm-smmu/arm-smmu.h b/drivers/iommu/arm/arm-smmu/arm-smmu.h
+index 5f6cdc328e491..41d4398c53c50 100644
+--- a/drivers/iommu/arm/arm-smmu/arm-smmu.h
++++ b/drivers/iommu/arm/arm-smmu/arm-smmu.h
+@@ -440,6 +440,7 @@ struct arm_smmu_impl {
+ 	int (*alloc_context_bank)(struct arm_smmu_domain *smmu_domain,
+ 				  struct arm_smmu_device *smmu,
+ 				  struct device *dev, int start);
++	void (*write_s2cr)(struct arm_smmu_device *smmu, int idx);
+ };
+ 
+ #define INVALID_SMENDX			-1
+-- 
+2.26.2
+

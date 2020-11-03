@@ -1,0 +1,113 @@
+From 4c21c025964d5a14d73bf09c05d601fa641497dc Mon Sep 17 00:00:00 2001
+From: Alexandre Courbot <acourbot@chromium.org>
+Date: Wed, 21 Oct 2020 09:09:43 +0900
+Subject: [PATCH 51/68] venus: vdec: return parsed crop information from stream
+
+Per the stateful codec specification, VIDIOC_G_SELECTION with a target
+of V4L2_SEL_TGT_COMPOSE is supposed to return the crop area of capture
+buffers containing the decoded frame. Until now the driver did not get
+that information from the firmware and just returned the dimensions of
+CAPTURE buffers.
+
+The firmware unfortunately does not always provide the crop information
+from the stream ; also make sure to detect when that happens and
+fallback to providing the coded size in these cases.
+
+Signed-off-by: Alexandre Courbot <acourbot@chromium.org>
+Signed-off-by: Steev Klimaszewski <steev@kali.org>
+---
+ drivers/media/platform/qcom/venus/core.h |  1 +
+ drivers/media/platform/qcom/venus/vdec.c | 32 ++++++++++++++++++++----
+ 2 files changed, 28 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/media/platform/qcom/venus/core.h b/drivers/media/platform/qcom/venus/core.h
+index 8c88516e46944..8db16d85fd305 100644
+--- a/drivers/media/platform/qcom/venus/core.h
++++ b/drivers/media/platform/qcom/venus/core.h
+@@ -353,6 +353,7 @@ struct venus_inst {
+ 	unsigned int streamon_cap, streamon_out;
+ 	u32 width;
+ 	u32 height;
++	struct v4l2_rect crop;
+ 	u32 out_width;
+ 	u32 out_height;
+ 	u32 colorspace;
+diff --git a/drivers/media/platform/qcom/venus/vdec.c b/drivers/media/platform/qcom/venus/vdec.c
+index 76be14efbfb09..7b2c9e6529bfa 100644
+--- a/drivers/media/platform/qcom/venus/vdec.c
++++ b/drivers/media/platform/qcom/venus/vdec.c
+@@ -325,6 +325,10 @@ static int vdec_s_fmt(struct file *file, void *fh, struct v4l2_format *f)
+ 
+ 	inst->width = format.fmt.pix_mp.width;
+ 	inst->height = format.fmt.pix_mp.height;
++	inst->crop.top = 0;
++	inst->crop.left = 0;
++	inst->crop.width = inst->width;
++	inst->crop.height = inst->height;
+ 
+ 	if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
+ 		inst->fmt_out = fmt;
+@@ -343,6 +347,9 @@ vdec_g_selection(struct file *file, void *fh, struct v4l2_selection *s)
+ 	    s->type != V4L2_BUF_TYPE_VIDEO_OUTPUT)
+ 		return -EINVAL;
+ 
++	s->r.top = 0;
++	s->r.left = 0;
++
+ 	switch (s->target) {
+ 	case V4L2_SEL_TGT_CROP_BOUNDS:
+ 	case V4L2_SEL_TGT_CROP_DEFAULT:
+@@ -363,16 +370,12 @@ vdec_g_selection(struct file *file, void *fh, struct v4l2_selection *s)
+ 	case V4L2_SEL_TGT_COMPOSE:
+ 		if (s->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
+ 			return -EINVAL;
+-		s->r.width = inst->out_width;
+-		s->r.height = inst->out_height;
++		s->r = inst->crop;
+ 		break;
+ 	default:
+ 		return -EINVAL;
+ 	}
+ 
+-	s->r.top = 0;
+-	s->r.left = 0;
+-
+ 	return 0;
+ }
+ 
+@@ -1309,6 +1312,21 @@ static void vdec_event_change(struct venus_inst *inst,
+ 
+ 	inst->width = format.fmt.pix_mp.width;
+ 	inst->height = format.fmt.pix_mp.height;
++	/*
++	 * Some versions of the firmware do not report crop information for
++	 * all codecs. For these cases, set the crop to the coded resolution.
++	 */
++	if (ev_data->input_crop.width > 0 && ev_data->input_crop.height > 0) {
++		inst->crop.left = ev_data->input_crop.left;
++		inst->crop.top = ev_data->input_crop.top;
++		inst->crop.width = ev_data->input_crop.width;
++		inst->crop.height = ev_data->input_crop.height;
++	} else {
++		inst->crop.left = 0;
++		inst->crop.top = 0;
++		inst->crop.width = ev_data->width;
++		inst->crop.height = ev_data->height;
++	}
+ 
+ 	inst->out_width = ev_data->width;
+ 	inst->out_height = ev_data->height;
+@@ -1412,6 +1430,10 @@ static void vdec_inst_init(struct venus_inst *inst)
+ 	inst->fmt_cap = &vdec_formats[0];
+ 	inst->width = frame_width_min(inst);
+ 	inst->height = ALIGN(frame_height_min(inst), 32);
++	inst->crop.left = 0;
++	inst->crop.top = 0;
++	inst->crop.width = inst->width;
++	inst->crop.height = inst->height;
+ 	inst->out_width = frame_width_min(inst);
+ 	inst->out_height = frame_height_min(inst);
+ 	inst->fps = 30;
+-- 
+2.26.2
+

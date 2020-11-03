@@ -1,0 +1,27 @@
+From 2da2f1ed46a712a92cfbffd0cf616689ffb94404 Mon Sep 17 00:00:00 2001
+From: Bjorn Andersson <bjorn.andersson@linaro.org>
+Date: Wed, 30 Sep 2020 12:54:41 -0500
+Subject: [PATCH 16/68] arm64: dts: qcom: sdm850-lenovo-yoga: Update max
+ brighness in bridge
+
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
+ arch/arm64/boot/dts/qcom/sdm850-lenovo-yoga-c630.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/sdm850-lenovo-yoga-c630.dts b/arch/arm64/boot/dts/qcom/sdm850-lenovo-yoga-c630.dts
+index 29bd3ff73b438..83689d9a44328 100644
+--- a/arch/arm64/boot/dts/qcom/sdm850-lenovo-yoga-c630.dts
++++ b/arch/arm64/boot/dts/qcom/sdm850-lenovo-yoga-c630.dts
+@@ -395,7 +395,7 @@ sn65dsi86: bridge@2c {
+ 		clocks = <&sn65dsi86_refclk>;
+ 		clock-names = "refclk";
+ 
+-		max-brightness = <255>;
++		ti,backlight-scale = <255>;
+ 
+ 		ports {
+ 			#address-cells = <1>;
+-- 
+2.26.2
+

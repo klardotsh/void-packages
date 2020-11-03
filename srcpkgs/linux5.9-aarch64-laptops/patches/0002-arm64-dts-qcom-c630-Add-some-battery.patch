@@ -1,0 +1,31 @@
+From 760dd0838116322b898e9bdeb86e8963b1f100da Mon Sep 17 00:00:00 2001
+From: Bjorn Andersson <bjorn.andersson@linaro.org>
+Date: Fri, 8 Nov 2019 18:55:24 -0800
+Subject: [PATCH 02/68] arm64: dts: qcom: c630: Add some-battery
+
+There's a some-battery on i2c1 address 0x70, add it.
+
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
+ arch/arm64/boot/dts/qcom/sdm850-lenovo-yoga-c630.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/sdm850-lenovo-yoga-c630.dts b/arch/arm64/boot/dts/qcom/sdm850-lenovo-yoga-c630.dts
+index d03ca31907466..fb8c7cc71f599 100644
+--- a/arch/arm64/boot/dts/qcom/sdm850-lenovo-yoga-c630.dts
++++ b/arch/arm64/boot/dts/qcom/sdm850-lenovo-yoga-c630.dts
+@@ -258,6 +258,11 @@ zap-shader {
+ &i2c1 {
+ 	status = "okay";
+ 	clock-frequency = <400000>;
++
++	battery@70 {
++		compatible = "some,battery";
++		reg = <0x70>;
++	};
+ };
+ 
+ &i2c3 {
+-- 
+2.26.2
+

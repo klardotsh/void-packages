@@ -1,0 +1,33 @@
+From 67fdb8ca45bff6bbfb61cae4da7882a97cb60acd Mon Sep 17 00:00:00 2001
+From: Akhil P Oommen <akhilpo@codeaurora.org>
+Date: Tue, 22 Sep 2020 20:25:27 +0530
+Subject: [PATCH 22/68] drm/msm: Leave inuse count intact on map failure
+
+Leave the inuse count intact on map failure to keep the accounting
+accurate.
+
+Signed-off-by: Akhil P Oommen <akhilpo@codeaurora.org>
+Signed-off-by: Rob Clark <robdclark@chromium.org>
+---
+ drivers/gpu/drm/msm/msm_gem_vma.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/msm/msm_gem_vma.c b/drivers/gpu/drm/msm/msm_gem_vma.c
+index 5f6a11211b645..22188f5447423 100644
+--- a/drivers/gpu/drm/msm/msm_gem_vma.c
++++ b/drivers/gpu/drm/msm/msm_gem_vma.c
+@@ -78,8 +78,10 @@ msm_gem_map_vma(struct msm_gem_address_space *aspace,
+ 		ret = aspace->mmu->funcs->map(aspace->mmu, vma->iova, sgt,
+ 				size, prot);
+ 
+-	if (ret)
++	if (ret) {
+ 		vma->mapped = false;
++		vma->inuse--;
++	}
+ 
+ 	return ret;
+ }
+-- 
+2.26.2
+
