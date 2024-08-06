@@ -1,0 +1,21 @@
+# Template file for 'waynergy'
+pkgname=waynergy
+version=0.0.17
+revision=1
+build_style=meson
+hostmakedepends="ninja pkg-config cmake wayland-devel"
+makedepends="wayland-devel libxkbcommon-devel libtls-devel"
+short_desc="Synergy client for Wayland compositors"
+maintainer="klardotsh <josh@klar.sh>"
+license="MIT"
+homepage="https://github.com/r-c-f/waynergy"
+distfiles="https://github.com/r-c-f/waynergy/archive/v${version}.tar.gz"
+checksum=b8b2d12588cabfe161ce21a5cd898f06bdfd55c0106ecd4a26c8628aafeff990
+
+#if [ "$XBPS_TARGET_LIBC" = "musl" ]; then
+#	makedepends+=" musl-legacy-compat"
+#fi
+
+post_install() {
+	vlicense LICENSE
+}
