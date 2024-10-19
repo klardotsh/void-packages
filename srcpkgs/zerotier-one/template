@@ -1,0 +1,24 @@
+# Template file for 'zerotier-one'
+pkgname=zerotier-one
+version=1.12.2
+revision=1
+wrksrc=ZeroTierOne-${version}
+build_style=gnu-makefile
+hostmakedepends="nodejs"
+makedepends="sqlite-devel"
+short_desc="Network Virtualization Everywhere"
+maintainer="Hadrian Węgrzynowski <hadrian@hawski.com>"
+license="custom:BPL-1.1"
+homepage="https://www.zerotier.com/"
+distfiles="https://github.com/zerotier/ZeroTierOne/archive/refs/tags/${version}.tar.gz"
+checksum=7c6512cfc208374ea9dc9931110e35f71800c34890e0f35991ea485aae66e31c
+repository=nonfree
+
+pre_install() {
+	sed -i 's/sbin/bin/g' make-linux.mk
+}
+
+post_install() {
+	vsv zerotier
+	vlicense LICENSE.txt
+}
